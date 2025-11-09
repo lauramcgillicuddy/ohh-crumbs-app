@@ -4,3 +4,4 @@ plotly
 sqlalchemy
 requests
 reportlab
+fpdf2==2.*
