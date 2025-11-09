@@ -1,0 +1,17 @@
+[project]
+name = "repl-nix-workspace"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "fpdf2>=2.8.5",
+    "pandas>=2.3.3",
+    "plotly>=6.4.0",
+    "psycopg2-binary>=2.9.11",
+    "pyyaml>=6.0.3",
+    "sqlalchemy>=2.0.44",
+    "squareup>=43.2.0.20251016",
+    "streamlit>=1.51.0",
+    "streamlit-authenticator>=0.4.2",
+    "streamlit-qrcode-scanner>=0.1.2",
+]
