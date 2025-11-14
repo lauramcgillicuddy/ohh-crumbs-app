@@ -1,5 +1,5 @@
 import os
-from square.client import Client
+from square import Square
 from datetime import datetime, timedelta
 import streamlit as st
 
@@ -7,12 +7,12 @@ class SquareAPI:
     def __init__(self):
         self.access_token = os.getenv('SQUARE_ACCESS_TOKEN')
         self.location_id = os.getenv('SQUARE_LOCATION_ID')
-        
+
         if not self.access_token:
             self.client = None
             self.is_configured = False
         else:
-            self.client = Client(
+            self.client = Square(
                 access_token=self.access_token,
                 environment='production'
             )
