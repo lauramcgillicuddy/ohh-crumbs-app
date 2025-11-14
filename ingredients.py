@@ -22,7 +22,7 @@ def show_ingredients():
                         col1, col2, col3 = st.columns(3)
                         
                         with col1:
-                            st.write(f"**Cost per {ingredient.unit}:** ${ingredient.cost_per_unit:.2f}")
+                            st.write(f"**Cost per {ingredient.unit}:** £{ingredient.cost_per_unit:.2f}")
                             st.write(f"**Current Stock:** {ingredient.current_stock:.2f} {ingredient.unit}")
                         
                         with col2:
@@ -251,7 +251,7 @@ def show_ingredients():
                     
                     with col_info1:
                         st.write(f"**Current Stock:** {ingredient.current_stock:.2f} {ingredient.unit}")
-                        st.write(f"**Cost per Unit:** ${ingredient.cost_per_unit:.2f}")
+                        st.write(f"**Cost per Unit:** £{ingredient.cost_per_unit:.2f}")
                     
                     with col_info2:
                         if ingredient.supplier_id:

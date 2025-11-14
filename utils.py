@@ -3,6 +3,10 @@ from sqlalchemy import func
 from models import Ingredient, Recipe, RecipeItem, SalesCache, DailyUsage
 import pandas as pd
 
+def format_currency(amount):
+    """Format amount as GBP currency"""
+    return f"£{amount:,.2f}"
+
 def calculate_recipe_cost(session, recipe_id):
     recipe = session.query(Recipe).filter_by(id=recipe_id).first()
     if not recipe:

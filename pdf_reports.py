@@ -35,9 +35,9 @@ def generate_sales_report(sales_data, start_date, end_date):
         pdf.set_font('Arial', 'B', 12)
         pdf.cell(0, 8, 'Summary', 0, 1, 'L')
         pdf.set_font('Arial', '', 10)
-        pdf.cell(0, 6, f'Total Revenue: ${total_revenue:,.2f}', 0, 1, 'L')
+        pdf.cell(0, 6, f'Total Revenue: £{total_revenue:,.2f}', 0, 1, 'L')
         pdf.cell(0, 6, f'Total Items Sold: {int(total_items):,}', 0, 1, 'L')
-        pdf.cell(0, 6, f'Average Order Value: ${(total_revenue/len(sales_data)):,.2f}', 0, 1, 'L')
+        pdf.cell(0, 6, f'Average Order Value: £{(total_revenue/len(sales_data)):,.2f}', 0, 1, 'L')
         pdf.ln(5)
         
         pdf.set_font('Arial', 'B', 12)
@@ -55,8 +55,8 @@ def generate_sales_report(sales_data, start_date, end_date):
         for _, row in sales_data.iterrows():
             pdf.cell(col_widths[0], 6, str(row['Item'])[:30], 1, 0, 'L')
             pdf.cell(col_widths[1], 6, str(int(row['Units Sold'])), 1, 0, 'C')
-            pdf.cell(col_widths[2], 6, f"${row['Sale Price']:.2f}", 1, 0, 'C')
-            pdf.cell(col_widths[3], 6, f"${row['Total Revenue']:,.2f}", 1, 1, 'C')
+            pdf.cell(col_widths[2], 6, f"£{row['Sale Price']:.2f}", 1, 0, 'C')
+            pdf.cell(col_widths[3], 6, f"£{row['Total Revenue']:,.2f}", 1, 1, 'C')
     
     return pdf.output(dest='S').encode('latin-1')
 
@@ -82,8 +82,8 @@ def generate_profit_report(profit_data):
         pdf.cell(0, 8, 'Summary', 0, 1, 'L')
         pdf.set_font('Arial', '', 10)
         pdf.cell(0, 6, f'Average Profit Margin: {avg_margin:.1f}%', 0, 1, 'L')
-        pdf.cell(0, 6, f'Total Profit: ${total_profit:,.2f}', 0, 1, 'L')
-        pdf.cell(0, 6, f'Total Revenue: ${total_revenue:,.2f}', 0, 1, 'L')
+        pdf.cell(0, 6, f'Total Profit: £{total_profit:,.2f}', 0, 1, 'L')
+        pdf.cell(0, 6, f'Total Revenue: £{total_revenue:,.2f}', 0, 1, 'L')
         pdf.ln(5)
         
         pdf.set_font('Arial', 'B', 12)
@@ -104,9 +104,9 @@ def generate_profit_report(profit_data):
         
         for _, row in sorted_data.iterrows():
             pdf.cell(col_widths[0], 6, str(row['Item'])[:20], 1, 0, 'L')
-            pdf.cell(col_widths[1], 6, f"${row['Cost']:.2f}", 1, 0, 'C')
-            pdf.cell(col_widths[2], 6, f"${row['Sale Price']:.2f}", 1, 0, 'C')
-            pdf.cell(col_widths[3], 6, f"${row['Profit per Item']:.2f}", 1, 0, 'C')
+            pdf.cell(col_widths[1], 6, f"£{row['Cost']:.2f}", 1, 0, 'C')
+            pdf.cell(col_widths[2], 6, f"£{row['Sale Price']:.2f}", 1, 0, 'C')
+            pdf.cell(col_widths[3], 6, f"£{row['Profit per Item']:.2f}", 1, 0, 'C')
             pdf.cell(col_widths[4], 6, f"{row['Margin %']:.1f}%", 1, 0, 'C')
             pdf.cell(col_widths[5], 6, str(int(row['Units Sold'])), 1, 1, 'C')
         
@@ -148,7 +148,7 @@ def generate_inventory_report(ingredients_data, low_stock_items):
         pdf.cell(0, 8, 'Summary', 0, 1, 'L')
         pdf.set_font('Arial', '', 10)
         pdf.cell(0, 6, f'Total Ingredients: {total_items}', 0, 1, 'L')
-        pdf.cell(0, 6, f'Total Inventory Value: ${total_value:,.2f}', 0, 1, 'L')
+        pdf.cell(0, 6, f'Total Inventory Value: £{total_value:,.2f}', 0, 1, 'L')
         pdf.cell(0, 6, f'Low Stock Items: {len(low_stock_items)}', 0, 1, 'L')
         pdf.ln(5)
         
@@ -204,8 +204,8 @@ def generate_inventory_report(ingredients_data, low_stock_items):
             
             pdf.cell(col_widths[0], 6, str(ing['name'])[:25], 1, 0, 'L')
             pdf.cell(col_widths[1], 6, f"{ing['current_stock']:.1f} {ing['unit']}", 1, 0, 'C')
-            pdf.cell(col_widths[2], 6, f"${ing['cost_per_unit']:.2f}", 1, 0, 'C')
-            pdf.cell(col_widths[3], 6, f"${value:.2f}", 1, 0, 'C')
+            pdf.cell(col_widths[2], 6, f"£{ing['cost_per_unit']:.2f}", 1, 0, 'C')
+            pdf.cell(col_widths[3], 6, f"£{value:.2f}", 1, 0, 'C')
             pdf.cell(col_widths[4], 6, str(ing['supplier'] or 'N/A')[:18], 1, 1, 'C')
     
     return pdf.output(dest='S').encode('latin-1')

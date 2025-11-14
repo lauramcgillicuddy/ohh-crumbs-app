@@ -49,7 +49,7 @@ def show_suppliers():
                         if orders:
                             st.write(f"**Recent Orders ({len(orders)}):**")
                             for order in orders:
-                                st.write(f"- {order.order_date.strftime('%Y-%m-%d')}: ${order.total_cost:.2f} ({order.status})")
+                                st.write(f"- {order.order_date.strftime('%Y-%m-%d')}: £{order.total_cost:.2f} ({order.status})")
                         
                         st.divider()
                         
@@ -137,7 +137,7 @@ def show_suppliers():
                         'cancelled': '❌'
                     }.get(order.status, '📦')
                     
-                    with st.expander(f"{status_emoji} Order #{order.id} - {supplier.name if supplier else 'Unknown'} - ${order.total_cost:.2f}"):
+                    with st.expander(f"{status_emoji} Order #{order.id} - {supplier.name if supplier else 'Unknown'} - £{order.total_cost:.2f}"):
                         col1, col2 = st.columns(2)
                         
                         with col1:
@@ -149,7 +149,7 @@ def show_suppliers():
                         with col2:
                             if order.actual_delivery_date:
                                 st.write(f"**Delivered:** {order.actual_delivery_date.strftime('%Y-%m-%d')}")
-                            st.write(f"**Total Cost:** ${order.total_cost:.2f}")
+                            st.write(f"**Total Cost:** £{order.total_cost:.2f}")
                         
                         if order.notes:
                             st.write(f"**Notes:** {order.notes}")
@@ -163,8 +163,8 @@ def show_suppliers():
                                     items_data.append({
                                         'Ingredient': ingredient.name,
                                         'Quantity': f"{item.quantity} {ingredient.unit}",
-                                        'Unit Cost': f"${item.unit_cost:.2f}",
-                                        'Total': f"${item.total_cost:.2f}"
+                                        'Unit Cost': f"£{item.unit_cost:.2f}",
+                                        'Total': f"£{item.total_cost:.2f}"
                                     })
                             
                             if items_data:

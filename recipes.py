@@ -20,13 +20,13 @@ def show_recipes():
                 for recipe in recipes:
                     cost, profit, margin = calculate_profit_margin(session, recipe.id)
                     
-                    with st.expander(f"{recipe.name} - ${recipe.sale_price:.2f} | Margin: {margin:.1f}%"):
+                    with st.expander(f"{recipe.name} - £{recipe.sale_price:.2f} | Margin: {margin:.1f}%"):
                         col1, col2 = st.columns(2)
                         
                         with col1:
-                            st.write(f"**Sale Price:** ${recipe.sale_price:.2f}")
-                            st.write(f"**Ingredient Cost:** ${cost:.2f}")
-                            st.write(f"**Profit per Item:** ${profit:.2f}")
+                            st.write(f"**Sale Price:** £{recipe.sale_price:.2f}")
+                            st.write(f"**Ingredient Cost:** £{cost:.2f}")
+                            st.write(f"**Profit per Item:** £{profit:.2f}")
                             st.write(f"**Profit Margin:** {margin:.1f}%")
                         
                         with col2:
@@ -42,7 +42,7 @@ def show_recipes():
                             for item in recipe.recipe_items:
                                 ingredient = item.ingredient
                                 item_cost = ingredient.cost_per_unit * item.quantity
-                                st.write(f"- {item.quantity:.2f} {ingredient.unit} of {ingredient.name} (${item_cost:.2f})")
+                                st.write(f"- {item.quantity:.2f} {ingredient.unit} of {ingredient.name} (£{item_cost:.2f})")
                         else:
                             st.info("No ingredients added to this recipe yet.")
                         
@@ -152,7 +152,7 @@ def show_recipes():
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        sale_price = st.number_input("Sale Price ($) *", min_value=0.0, step=0.01, value=0.0)
+                        sale_price = st.number_input("Sale Price (£) *", min_value=0.0, step=0.01, value=0.0)
                     
                     with col2:
                         category = st.text_input("Category", placeholder="e.g., Cookies")

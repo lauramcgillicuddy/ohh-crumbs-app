@@ -61,7 +61,7 @@ def show_profit_analysis():
             st.metric(
                 "Most Profitable Item",
                 df.loc[df['Total Profit'].idxmax(), 'Item'] if not df.empty and df['Total Profit'].max() > 0 else "N/A",
-                f"${df['Total Profit'].max():,.2f}" if not df.empty else "$0"
+                f"£{df['Total Profit'].max():,.2f}" if not df.empty else "£0"
             )
         
         st.divider()
@@ -230,7 +230,7 @@ def show_profit_analysis():
                 
                 with col_stat2:
                     total_profit = daily_avg['profit'].sum()
-                    st.metric("Total Profit (Period)", f"${total_profit:.2f}")
+                    st.metric("Total Profit (Period)", f"£{total_profit:.2f}")
                 
                 with col_stat3:
                     total_quantity = daily_avg['quantity'].sum()
@@ -294,12 +294,12 @@ def show_profit_analysis():
             st.subheader("Detailed Profit Analysis")
             
             display_df = df.copy()
-            display_df['Sale Price'] = display_df['Sale Price'].apply(lambda x: f"${x:.2f}")
-            display_df['Cost'] = display_df['Cost'].apply(lambda x: f"${x:.2f}")
-            display_df['Profit per Item'] = display_df['Profit per Item'].apply(lambda x: f"${x:.2f}")
+            display_df['Sale Price'] = display_df['Sale Price'].apply(lambda x: f"£{x:.2f}")
+            display_df['Cost'] = display_df['Cost'].apply(lambda x: f"£{x:.2f}")
+            display_df['Profit per Item'] = display_df['Profit per Item'].apply(lambda x: f"£{x:.2f}")
             display_df['Margin %'] = display_df['Margin %'].apply(lambda x: f"{x:.1f}%")
-            display_df['Total Revenue'] = display_df['Total Revenue'].apply(lambda x: f"${x:.2f}")
-            display_df['Total Profit'] = display_df['Total Profit'].apply(lambda x: f"${x:.2f}")
+            display_df['Total Revenue'] = display_df['Total Revenue'].apply(lambda x: f"£{x:.2f}")
+            display_df['Total Profit'] = display_df['Total Profit'].apply(lambda x: f"£{x:.2f}")
             
             st.dataframe(display_df, use_container_width=True, hide_index=True)
             
@@ -354,14 +354,14 @@ def show_profit_analysis():
                     most_profitable = df.loc[df['Total Profit'].idxmax()]
                     
                     if best_seller['Item'] != most_profitable['Item']:
-                        st.info(f"💡 **Interesting Finding:** Your best-selling item is '{best_seller['Item']}' ({int(best_seller['Units Sold'])} sold), but '{most_profitable['Item']}' generates more total profit (${most_profitable['Total Profit']:.2f} vs ${best_seller['Total Profit']:.2f}).")
+                        st.info(f"💡 **Interesting Finding:** Your best-selling item is '{best_seller['Item']}' ({int(best_seller['Units Sold'])} sold), but '{most_profitable['Item']}' generates more total profit (£{most_profitable['Total Profit']:.2f} vs £{best_seller['Total Profit']:.2f}).")
                 
                 expensive_items = df[df['Cost'] > df['Cost'].median()]
                 if not expensive_items.empty:
                     st.write("---")
                     st.write("**💸 High-Cost Items** (above median ingredient cost)")
                     for _, row in expensive_items.iterrows():
-                        st.write(f"- **{row['Item']}**: ${row['Cost']:.2f} cost per item")
+                        st.write(f"- **{row['Item']}**: £{row['Cost']:.2f} cost per item")
             else:
                 st.info("Add recipes and sales data to see insights!")
     
