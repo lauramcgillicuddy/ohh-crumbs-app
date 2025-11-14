@@ -2,6 +2,7 @@ streamlit==1.39.0
 pandas
 plotly
 sqlalchemy
+psycopg2-binary
 requests
 reportlab
 fpdf2==2.*
