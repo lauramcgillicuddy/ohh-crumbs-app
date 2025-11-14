@@ -286,8 +286,18 @@ def show_suppliers():
                     with col_items:
                         st.markdown(f"**📦 All Line Items ({len(all_line_items)} items):**")
                         if parsed_data.get('line_items'):
-                            items_df = pd.DataFrame(parsed_data['line_items'])
-                            st.dataframe(items_df, use_container_width=True)
+                            # Display only the required columns
+                            display_items = []
+                            for item in parsed_data['line_items']:
+                                display_items.append({
+                                    'Qty Ord': item.get('quantity', 1.0),
+                                    'Description': item.get('item_name', ''),
+                                    'Price': f"£{item.get('unit_cost', 0):.2f}",
+                                    'Net Amount': f"£{item.get('total_cost', 0):.2f}"
+                                })
+
+                            items_df = pd.DataFrame(display_items)
+                            st.dataframe(items_df, use_container_width=True, hide_index=True)
                         else:
                             st.write("No line items found")
 
@@ -296,12 +306,103 @@ def show_suppliers():
 
                     st.divider()
 
-                    # Auto-fill option
-                    if st.button("✨ Auto-Fill Supplier Form", type="primary"):
-                        # Store parsed data in session state
-                        st.session_state['parsed_receipt_data'] = parsed_data
-                        st.success("Data ready! Scroll down to review and save.")
-                        st.rerun()
+                    # Save to database option
+                    col_btn1, col_btn2 = st.columns(2)
+
+                    with col_btn1:
+                        if st.button("✨ Auto-Fill Supplier Form", type="primary"):
+                            # Store parsed data in session state
+                            st.session_state['parsed_receipt_data'] = parsed_data
+                            st.success("Data ready! Scroll down to review and save.")
+                            st.rerun()
+
+                    with col_btn2:
+                        if st.button("💾 Save as Supplier Order", type="secondary"):
+                            # Save directly to database as supplier order
+                            if parsed_data.get('vendor_name'):
+                                try:
+                                    # Check if supplier exists
+                                    supplier = session.query(Supplier).filter(
+                                        Supplier.name.ilike(f"%{parsed_data['vendor_name']}%")
+                                    ).first()
+
+                                    if not supplier:
+                                        # Create new supplier
+                                        supplier = Supplier(
+                                            name=parsed_data['vendor_name'],
+                                            email=parsed_data.get('vendor_email'),
+                                            phone=parsed_data.get('vendor_phone'),
+                                            address=parsed_data.get('vendor_address'),
+                                            lead_time_days=7
+                                        )
+                                        session.add(supplier)
+                                        session.flush()  # Get supplier ID
+
+                                    # Create supplier order
+                                    order_date = parsed_data.get('order_date') or datetime.utcnow()
+                                    total_cost = sum(item['total_cost'] for item in parsed_data['line_items'])
+
+                                    new_order = SupplierOrder(
+                                        supplier_id=supplier.id,
+                                        order_date=order_date,
+                                        expected_delivery_date=order_date + timedelta(days=supplier.lead_time_days),
+                                        status='delivered',  # Mark as delivered since it's from a receipt
+                                        actual_delivery_date=order_date,
+                                        total_cost=total_cost,
+                                        notes=f"Imported from receipt on {datetime.utcnow().strftime('%Y-%m-%d')}"
+                                    )
+                                    session.add(new_order)
+                                    session.flush()
+
+                                    # Create ingredients and order items
+                                    for item in parsed_data['line_items']:
+                                        # Check if ingredient exists
+                                        ingredient = session.query(Ingredient).filter(
+                                            Ingredient.name.ilike(f"%{item['item_name']}%")
+                                        ).first()
+
+                                        if not ingredient:
+                                            # Create new ingredient
+                                            ingredient = Ingredient(
+                                                name=item['item_name'],
+                                                unit='units',  # Default, user can edit later
+                                                cost_per_unit=item['unit_cost'],
+                                                current_stock=item['quantity'],
+                                                reorder_point=10,
+                                                supplier_id=supplier.id
+                                            )
+                                            session.add(ingredient)
+                                            session.flush()
+                                        else:
+                                            # Update stock
+                                            ingredient.current_stock += item['quantity']
+                                            ingredient.cost_per_unit = item['unit_cost']
+
+                                        # Create order item
+                                        order_item = SupplierOrderItem(
+                                            order_id=new_order.id,
+                                            ingredient_id=ingredient.id,
+                                            quantity=item['quantity'],
+                                            unit_cost=item['unit_cost'],
+                                            total_cost=item['total_cost']
+                                        )
+                                        session.add(order_item)
+
+                                    session.commit()
+
+                                    st.success(f"✅ Saved! Created {len(parsed_data['line_items'])} ingredients and supplier order #{new_order.id}")
+
+                                    # Clear parsed data
+                                    if 'parsed_receipt_data' in st.session_state:
+                                        del st.session_state['parsed_receipt_data']
+
+                                    st.rerun()
+
+                                except Exception as e:
+                                    session.rollback()
+                                    st.error(f"Error saving to database: {str(e)}")
+                            else:
+                                st.warning("Need vendor name to save. Use Auto-Fill instead.")
                 else:
                     st.warning("⚠️ Could not parse any receipts. Please use manual entry below.")
 
