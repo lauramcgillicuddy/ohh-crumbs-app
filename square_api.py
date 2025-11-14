@@ -133,16 +133,20 @@ class SquareAPI:
                     }
                 }
 
-                result = self.client.orders.search(
-                    location_ids=[self.location_id],
-                    query=query_filter,
-                    limit=100,
-                    cursor=cursor
-                )
+                # Build search params - only include cursor if it exists
+                search_params = {
+                    'location_ids': [self.location_id],
+                    'query': query_filter,
+                    'limit': 100
+                }
+                if cursor:
+                    search_params['cursor'] = cursor
 
-                order_list = result.orders if hasattr(result, 'orders') else []
+                result = self.client.orders.search(**search_params)
+
+                order_list = result.orders if hasattr(result, 'orders') and result.orders else []
                 for order in order_list:
-                    line_items = order.line_items if hasattr(order, 'line_items') else []
+                    line_items = order.line_items if hasattr(order, 'line_items') and order.line_items else []
 
                     for item in line_items:
                         total_money = item.total_money if hasattr(item, 'total_money') else None
