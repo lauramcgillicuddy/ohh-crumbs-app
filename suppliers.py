@@ -4,6 +4,7 @@ from database import get_session, close_session
 from models import Supplier, Ingredient, SupplierOrder, SupplierOrderItem
 from datetime import datetime, timedelta
 import pandas as pd
+from receipt_parser import parse_receipt_with_ai, extract_text_from_image, parse_receipt_text
 
 def show_suppliers():
     inject_custom_css()
@@ -202,13 +203,113 @@ def show_suppliers():
         
         with tab3:
             st.subheader("Add New Supplier")
-            
+
+            # Receipt upload section
+            st.markdown("#### 📄 Option 1: Upload Receipt/Invoice")
+            st.info("Upload a receipt or invoice to automatically extract vendor details and line items!")
+
+            uploaded_file = st.file_uploader(
+                "Upload Receipt (JPG, PNG, PDF)",
+                type=['jpg', 'jpeg', 'png', 'pdf'],
+                help="Upload a clear photo or scan of your receipt/invoice"
+            )
+
+            parsed_data = None
+
+            if uploaded_file is not None:
+                with st.spinner("🔍 Analyzing receipt..."):
+                    try:
+                        # Read file bytes
+                        file_bytes = uploaded_file.read()
+
+                        # Try AI parsing first (if OpenAI key available)
+                        parsed_data = parse_receipt_with_ai(file_bytes)
+
+                        # Fallback to OCR + text parsing
+                        if not parsed_data:
+                            st.info("Using OCR to extract text... (Install pytesseract for better results)")
+                            extracted_text = extract_text_from_image(file_bytes)
+
+                            if extracted_text:
+                                parsed_data = parse_receipt_text(extracted_text)
+
+                                # Show extracted text for debugging
+                                with st.expander("📝 Extracted Text (for debugging)"):
+                                    st.text(extracted_text)
+
+                        if parsed_data:
+                            st.success("✅ Receipt parsed successfully!")
+
+                            # Display parsed data
+                            col_vendor, col_items = st.columns(2)
+
+                            with col_vendor:
+                                st.markdown("**🏢 Vendor Information:**")
+                                if parsed_data.get('vendor_name'):
+                                    st.write(f"**Name:** {parsed_data['vendor_name']}")
+                                if parsed_data.get('vendor_email'):
+                                    st.write(f"**Email:** {parsed_data['vendor_email']}")
+                                if parsed_data.get('vendor_phone'):
+                                    st.write(f"**Phone:** {parsed_data['vendor_phone']}")
+                                if parsed_data.get('vendor_address'):
+                                    st.write(f"**Address:** {parsed_data['vendor_address']}")
+                                if parsed_data.get('order_date'):
+                                    st.write(f"**Date:** {parsed_data['order_date'].strftime('%Y-%m-%d')}")
+
+                            with col_items:
+                                st.markdown("**📦 Line Items:**")
+                                if parsed_data.get('line_items'):
+                                    items_df = pd.DataFrame(parsed_data['line_items'])
+                                    st.dataframe(items_df, use_container_width=True)
+                                else:
+                                    st.write("No line items found")
+
+                                if parsed_data.get('total_amount'):
+                                    st.write(f"**Total:** £{parsed_data['total_amount']:.2f}")
+
+                            st.divider()
+
+                            # Auto-fill option
+                            if st.button("✨ Auto-Fill Supplier Form", type="primary"):
+                                # Store parsed data in session state
+                                st.session_state['parsed_receipt_data'] = parsed_data
+                                st.success("Data ready! Scroll down to review and save.")
+                                st.rerun()
+                        else:
+                            st.warning("Could not parse receipt. Please use manual entry below.")
+
+                    except Exception as e:
+                        st.error(f"Error processing receipt: {str(e)}")
+                        st.info("Please use manual entry below.")
+
+            st.divider()
+            st.markdown("#### ✍️ Option 2: Manual Entry")
+
+            # Get auto-filled data from session state if available
+            autofill_data = st.session_state.get('parsed_receipt_data', {})
+
             with st.form("add_supplier_form"):
-                name = st.text_input("Supplier Name *", placeholder="e.g., Acme Flour Company")
+                name = st.text_input(
+                    "Supplier Name *",
+                    value=autofill_data.get('vendor_name', ''),
+                    placeholder="e.g., Acme Flour Company"
+                )
                 contact_name = st.text_input("Contact Name", placeholder="e.g., John Smith")
-                email = st.text_input("Email", placeholder="e.g., orders@acmeflour.com")
-                phone = st.text_input("Phone", placeholder="e.g., (555) 123-4567")
-                address = st.text_area("Address", placeholder="123 Main St\nCity, State ZIP")
+                email = st.text_input(
+                    "Email",
+                    value=autofill_data.get('vendor_email', ''),
+                    placeholder="e.g., orders@acmeflour.com"
+                )
+                phone = st.text_input(
+                    "Phone",
+                    value=autofill_data.get('vendor_phone', ''),
+                    placeholder="e.g., (555) 123-4567"
+                )
+                address = st.text_area(
+                    "Address",
+                    value=autofill_data.get('vendor_address', ''),
+                    placeholder="123 Main St\nCity, State ZIP"
+                )
                 lead_time = st.number_input("Lead Time (days)", min_value=1, value=7, help="Typical delivery time in days")
                 notes = st.text_area("Notes", placeholder="Any special instructions or information")
                 
@@ -235,6 +336,11 @@ def show_suppliers():
                                 
                                 session.add(new_supplier)
                                 session.commit()
+
+                                # Clear parsed receipt data from session
+                                if 'parsed_receipt_data' in st.session_state:
+                                    del st.session_state['parsed_receipt_data']
+
                                 st.success(f"✅ Added supplier: {name}")
                                 st.rerun()
                         except Exception as e:
