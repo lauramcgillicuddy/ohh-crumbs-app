@@ -4,9 +4,12 @@ from database import get_session, close_session
 from models import SalesCache, Recipe
 from datetime import datetime
 import os
+from styling import inject_custom_css, render_page_header
 
 def show_square_setup():
-    st.title("🔗 Square API Integration")
+    inject_custom_css()
+
+    render_page_header("🔗 Square API Integration", "SYNC YOUR SALES & PRODUCTS")
     
     st.write("""
     Connect your Square account to automatically import sales data, menu items, and pricing information.

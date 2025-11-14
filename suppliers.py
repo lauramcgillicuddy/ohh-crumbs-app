@@ -1,11 +1,14 @@
 import streamlit as st
+from styling import inject_custom_css, render_page_header
 from database import get_session, close_session
 from models import Supplier, Ingredient, SupplierOrder, SupplierOrderItem
 from datetime import datetime, timedelta
 import pandas as pd
 
 def show_suppliers():
-    st.title("📦 Supplier Management")
+    inject_custom_css()
+
+    render_page_header("📦 Supplier Management", "MANAGE YOUR VENDORS")
     
     session = get_session()
     

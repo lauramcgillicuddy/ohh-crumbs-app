@@ -1,4 +1,5 @@
 import streamlit as st
+from styling import inject_custom_css, render_page_header
 from database import get_session, close_session
 from models import Ingredient, Supplier, SupplierOrder, SupplierOrderItem
 from utils import get_low_stock_ingredients, calculate_reorder_threshold
@@ -8,7 +9,9 @@ from pdf_reports import generate_inventory_report
 from datetime import datetime, timedelta
 
 def show_inventory_alerts():
-    st.title("🔔 Inventory Alerts")
+    inject_custom_css()
+
+    render_page_header("🔔 Inventory Alerts", "STAY STOCKED UP")
     
     session = get_session()
     
