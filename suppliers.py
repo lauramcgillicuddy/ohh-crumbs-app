@@ -206,81 +206,104 @@ def show_suppliers():
 
             # Receipt upload section
             st.markdown("#### 📄 Option 1: Upload Receipt/Invoice")
-            st.info("Upload a receipt or invoice to automatically extract vendor details and line items!")
+            st.info("Upload one or more receipts/invoices to automatically extract vendor details and line items!")
 
-            uploaded_file = st.file_uploader(
-                "Upload Receipt (JPG, PNG, PDF)",
+            uploaded_files = st.file_uploader(
+                "Upload Receipt(s) (JPG, PNG, PDF)",
                 type=['jpg', 'jpeg', 'png', 'pdf'],
-                help="Upload a clear photo or scan of your receipt/invoice"
+                accept_multiple_files=True,
+                help="Upload clear photos or scans of your receipts/invoices"
             )
 
             parsed_data = None
+            all_parsed_data = []
 
-            if uploaded_file is not None:
-                with st.spinner("🔍 Analyzing receipt..."):
-                    try:
-                        # Read file bytes
-                        file_bytes = uploaded_file.read()
+            if uploaded_files:
+                for idx, uploaded_file in enumerate(uploaded_files):
+                    st.markdown(f"**Processing: {uploaded_file.name}**")
 
-                        # Try AI parsing first (if OpenAI key available)
-                        parsed_data = parse_receipt_with_ai(file_bytes)
+                    with st.spinner(f"🔍 Analyzing {uploaded_file.name}..."):
+                        try:
+                            # Read file bytes
+                            file_bytes = uploaded_file.read()
 
-                        # Fallback to OCR + text parsing
-                        if not parsed_data:
-                            st.info("Using OCR to extract text... (Install pytesseract for better results)")
-                            extracted_text = extract_text_from_image(file_bytes)
+                            # Try AI parsing first (if OpenAI key available)
+                            current_parsed = parse_receipt_with_ai(file_bytes)
 
-                            if extracted_text:
-                                parsed_data = parse_receipt_text(extracted_text)
+                            # Fallback to OCR + text parsing
+                            if not current_parsed:
+                                st.info(f"Using OCR to extract text from {uploaded_file.name}...")
+                                extracted_text = extract_text_from_image(file_bytes, uploaded_file.name)
 
-                                # Show extracted text for debugging
-                                with st.expander("📝 Extracted Text (for debugging)"):
-                                    st.text(extracted_text)
+                                if extracted_text:
+                                    current_parsed = parse_receipt_text(extracted_text)
 
-                        if parsed_data:
-                            st.success("✅ Receipt parsed successfully!")
+                                    # Show extracted text for debugging
+                                    with st.expander(f"📝 Extracted Text from {uploaded_file.name}"):
+                                        st.text(extracted_text)
 
-                            # Display parsed data
-                            col_vendor, col_items = st.columns(2)
+                            if current_parsed:
+                                all_parsed_data.append(current_parsed)
+                                st.success(f"✅ {uploaded_file.name} parsed successfully!")
+                            else:
+                                st.warning(f"⚠️ Could not parse {uploaded_file.name}")
 
-                            with col_vendor:
-                                st.markdown("**🏢 Vendor Information:**")
-                                if parsed_data.get('vendor_name'):
-                                    st.write(f"**Name:** {parsed_data['vendor_name']}")
-                                if parsed_data.get('vendor_email'):
-                                    st.write(f"**Email:** {parsed_data['vendor_email']}")
-                                if parsed_data.get('vendor_phone'):
-                                    st.write(f"**Phone:** {parsed_data['vendor_phone']}")
-                                if parsed_data.get('vendor_address'):
-                                    st.write(f"**Address:** {parsed_data['vendor_address']}")
-                                if parsed_data.get('order_date'):
-                                    st.write(f"**Date:** {parsed_data['order_date'].strftime('%Y-%m-%d')}")
+                        except Exception as e:
+                            st.error(f"Error processing {uploaded_file.name}: {str(e)}")
 
-                            with col_items:
-                                st.markdown("**📦 Line Items:**")
-                                if parsed_data.get('line_items'):
-                                    items_df = pd.DataFrame(parsed_data['line_items'])
-                                    st.dataframe(items_df, use_container_width=True)
-                                else:
-                                    st.write("No line items found")
+                # Use the first successfully parsed receipt for vendor info
+                if all_parsed_data:
+                    parsed_data = all_parsed_data[0]
 
-                                if parsed_data.get('total_amount'):
-                                    st.write(f"**Total:** £{parsed_data['total_amount']:.2f}")
+                    # Aggregate line items from all receipts
+                    all_line_items = []
+                    for data in all_parsed_data:
+                        if data.get('line_items'):
+                            all_line_items.extend(data['line_items'])
 
-                            st.divider()
+                    parsed_data['line_items'] = all_line_items
 
-                            # Auto-fill option
-                            if st.button("✨ Auto-Fill Supplier Form", type="primary"):
-                                # Store parsed data in session state
-                                st.session_state['parsed_receipt_data'] = parsed_data
-                                st.success("Data ready! Scroll down to review and save.")
-                                st.rerun()
+                    st.divider()
+
+                    # Display aggregated parsed data
+                    st.markdown(f"**📊 Summary: Processed {len(uploaded_files)} file(s), {len(all_parsed_data)} successful**")
+
+                    col_vendor, col_items = st.columns(2)
+
+                    with col_vendor:
+                        st.markdown("**🏢 Vendor Information:**")
+                        if parsed_data.get('vendor_name'):
+                            st.write(f"**Name:** {parsed_data['vendor_name']}")
+                        if parsed_data.get('vendor_email'):
+                            st.write(f"**Email:** {parsed_data['vendor_email']}")
+                        if parsed_data.get('vendor_phone'):
+                            st.write(f"**Phone:** {parsed_data['vendor_phone']}")
+                        if parsed_data.get('vendor_address'):
+                            st.write(f"**Address:** {parsed_data['vendor_address']}")
+                        if parsed_data.get('order_date'):
+                            st.write(f"**Date:** {parsed_data['order_date'].strftime('%Y-%m-%d')}")
+
+                    with col_items:
+                        st.markdown(f"**📦 All Line Items ({len(all_line_items)} items):**")
+                        if parsed_data.get('line_items'):
+                            items_df = pd.DataFrame(parsed_data['line_items'])
+                            st.dataframe(items_df, use_container_width=True)
                         else:
-                            st.warning("Could not parse receipt. Please use manual entry below.")
+                            st.write("No line items found")
 
-                    except Exception as e:
-                        st.error(f"Error processing receipt: {str(e)}")
-                        st.info("Please use manual entry below.")
+                        if parsed_data.get('total_amount'):
+                            st.write(f"**Total:** £{parsed_data['total_amount']:.2f}")
+
+                    st.divider()
+
+                    # Auto-fill option
+                    if st.button("✨ Auto-Fill Supplier Form", type="primary"):
+                        # Store parsed data in session state
+                        st.session_state['parsed_receipt_data'] = parsed_data
+                        st.success("Data ready! Scroll down to review and save.")
+                        st.rerun()
+                else:
+                    st.warning("⚠️ Could not parse any receipts. Please use manual entry below.")
 
             st.divider()
             st.markdown("#### ✍️ Option 2: Manual Entry")

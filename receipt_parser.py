@@ -243,25 +243,58 @@ Return as JSON with this structure:
     return None
 
 
-def extract_text_from_image(image_bytes: bytes) -> str:
+def extract_text_from_image(image_bytes: bytes, filename: str = "") -> str:
     """
-    Extract text from image using pytesseract OCR.
+    Extract text from image or PDF using pytesseract OCR.
     """
     try:
         from PIL import Image
-        import pytesseract
         import io
 
-        # Open image
-        image = Image.open(io.BytesIO(image_bytes))
+        # Check if it's a PDF
+        if filename.lower().endswith('.pdf'):
+            try:
+                import pdf2image
+                # Convert PDF to images
+                images = pdf2image.convert_from_bytes(image_bytes)
 
-        # Extract text
-        text = pytesseract.image_to_string(image)
+                # Try to import pytesseract
+                try:
+                    import pytesseract
+                    text = ""
+                    for img in images:
+                        text += pytesseract.image_to_string(img) + "\n"
+                    return text
+                except ImportError:
+                    st.warning("pytesseract not available. Using basic text extraction.")
+                    return ""
+            except ImportError:
+                st.error("pdf2image not installed. Cannot process PDF files. Please upload JPG/PNG instead.")
+                return ""
+        else:
+            # It's an image file
+            try:
+                # Create a fresh BytesIO object
+                image_file = io.BytesIO(image_bytes)
+                image = Image.open(image_file)
 
-        return text
-    except ImportError:
-        st.error("OCR libraries not installed. Please install pytesseract and Pillow.")
-        return ""
+                # Convert to RGB if needed
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+
+                # Try to use pytesseract
+                try:
+                    import pytesseract
+                    text = pytesseract.image_to_string(image)
+                    return text
+                except ImportError:
+                    st.warning("pytesseract not installed. OCR not available. Please add to Streamlit secrets: OPENAI_API_KEY for AI parsing.")
+                    return ""
+
+            except Exception as e:
+                st.error(f"Error opening image: {str(e)}. Make sure the file is a valid image (JPG, PNG).")
+                return ""
+
     except Exception as e:
         st.error(f"Error extracting text: {str(e)}")
         return ""
