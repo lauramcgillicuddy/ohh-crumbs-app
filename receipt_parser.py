@@ -63,17 +63,26 @@ def parse_receipt_text(text: str) -> Dict:
                 except:
                     pass
 
-    # Extract line items (quantity, item name, price)
-    # Pattern: quantity + item name + price (e.g., "2kg Flour £3.50" or "Flour 2kg £3.50")
+    # Extract line items (quantity, item name, unit price, total price)
+    # Updated patterns to handle receipts with both unit price AND net amount
     item_patterns = [
+        # Pattern with qty, item name, unit price, and net amount (e.g., "10 Ardress Diced Apple Pie Mix 19.80 10kg 198.00")
+        r'(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)?\s*([A-Za-z][A-Za-z\s\-\'&.]+?)\s+(\d+\.\d{2})\s+(?:\d+(?:\.\d+)?)?(?:kg|g|l|ml|lb|oz|x|pcs|cm|mm)?\s+(\d+\.\d{2})',
+        # Pattern with qty, item, single price (e.g., "2kg Flour 3.50")
         r'(\d+(?:\.\d+)?)\s*(?:kg|g|l|ml|lb|oz|x)?\s+([A-Za-z\s]+?)\s+£?(\d+\.\d{2})',
+        # Pattern with item, qty, price (e.g., "Flour 2kg 3.50")
         r'([A-Za-z\s]+?)\s+(\d+(?:\.\d+)?)\s*(?:kg|g|l|ml|lb|oz|x)?\s+£?(\d+\.\d{2})',
+        # Pattern with just item and price (e.g., "Flour 3.50")
         r'([A-Za-z\s]+?)\s+£?(\d+\.\d{2})',
     ]
 
     for line in lines:
         # Skip header lines
-        if any(keyword in line.lower() for keyword in ['total', 'subtotal', 'vat', 'tax', 'invoice', 'receipt', 'date']):
+        if any(keyword in line.lower() for keyword in ['total', 'subtotal', 'vat', 'tax', 'invoice', 'receipt', 'date', 'code', 'qty', 'price', 'amount']):
+            continue
+
+        # Skip very short lines
+        if len(line.strip()) < 5:
             continue
 
         for pattern in item_patterns:
@@ -81,10 +90,25 @@ def parse_receipt_text(text: str) -> Dict:
             if match:
                 groups = match.groups()
 
-                if len(groups) == 3:
-                    # Could be (qty, item, price) or (item, qty, price) or (item, price)
-                    try:
-                        # Try to determine which is which
+                try:
+                    if len(groups) == 5:
+                        # Format: qty, qty_again?, item_name, unit_price, net_amount
+                        qty = float(groups[0])
+                        item_name = groups[2].strip()
+                        unit_price = float(groups[3])
+                        net_amount = float(groups[4])
+
+                        if item_name and net_amount > 0:
+                            result['line_items'].append({
+                                'item_name': item_name,
+                                'quantity': qty,
+                                'unit_cost': unit_price,  # Use the unit price directly
+                                'total_cost': net_amount   # Use the net amount as total
+                            })
+                            break
+
+                    elif len(groups) == 3:
+                        # Could be (qty, item, price) or (item, qty, price)
                         if groups[0].replace('.', '').isdigit() and len(groups[0]) < 5:
                             # First group is quantity
                             qty = float(groups[0])
@@ -109,11 +133,9 @@ def parse_receipt_text(text: str) -> Dict:
                                 'total_cost': price
                             })
                             break
-                    except (ValueError, IndexError):
-                        continue
-                elif len(groups) == 2:
-                    # (item, price)
-                    try:
+
+                    elif len(groups) == 2:
+                        # (item, price)
                         item_name = groups[0].strip()
                         price = float(groups[1])
                         if item_name and price > 0:
@@ -124,8 +146,9 @@ def parse_receipt_text(text: str) -> Dict:
                                 'total_cost': price
                             })
                             break
-                    except (ValueError, IndexError):
-                        continue
+
+                except (ValueError, IndexError):
+                    continue
 
     # Extract total
     total_pattern = r'(?:total|grand\s+total|amount\s+due)[\s:]*£?(\d+\.\d{2})'
