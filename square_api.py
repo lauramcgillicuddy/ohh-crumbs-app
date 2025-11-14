@@ -13,8 +13,7 @@ class SquareAPI:
             self.is_configured = False
         else:
             self.client = Square(
-                access_token=self.access_token,
-                environment='production'
+                token=self.access_token
             )
             self.is_configured = True
     
