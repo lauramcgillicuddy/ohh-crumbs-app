@@ -122,25 +122,23 @@ class SquareAPI:
             cursor = None
 
             while True:
-                body = {
-                    'location_ids': [self.location_id],
-                    'query': {
-                        'filter': {
-                            'date_time_filter': {
-                                'created_at': {
-                                    'start_at': begin_time,
-                                    'end_at': end_time
-                                }
+                query_filter = {
+                    'filter': {
+                        'date_time_filter': {
+                            'created_at': {
+                                'start_at': begin_time,
+                                'end_at': end_time
                             }
                         }
-                    },
-                    'limit': 100
+                    }
                 }
 
-                if cursor:
-                    body['cursor'] = cursor
-
-                result = self.client.orders.search(body=body)
+                result = self.client.orders.search(
+                    location_ids=[self.location_id],
+                    query=query_filter,
+                    limit=100,
+                    cursor=cursor
+                )
 
                 order_list = result.orders if hasattr(result, 'orders') else []
                 for order in order_list:
