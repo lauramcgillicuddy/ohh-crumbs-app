@@ -9,9 +9,12 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import pandas as pd
 from pdf_reports import generate_sales_report
+from styling import inject_custom_css, render_page_header
 
 def show_dashboard():
-    st.markdown("<h1>Ohh Crumbs</h1><p style='text-align: center; color: #8B7355; font-size: 1rem; margin-top: -1rem; letter-spacing: 2px;'>CAKE AND CRUMBLE</p>", unsafe_allow_html=True)
+    inject_custom_css()
+
+    render_page_header("🧁 Ohh Crumbs", "CAKE AND CRUMBLE")
 
     # Auto-sync Square sales data (runs once per hour due to cache)
     sync_result = auto_sync_square_sales(days_back=30)
@@ -101,7 +104,7 @@ def show_dashboard():
                 'quantity': 'sum'
             }).reset_index()
 
-            # Peachy-gold themed chart
+            # Pastel pink themed chart
             fig_revenue = px.line(
                 daily_sales,
                 x='date',
@@ -110,25 +113,25 @@ def show_dashboard():
             )
             fig_revenue.update_layout(
                 height=400,
-                plot_bgcolor='rgba(255,250,245,0.5)',
-                paper_bgcolor='white',
-                font=dict(color='#5D4E37', size=12),
-                title_font=dict(size=16, color='#C9A882'),
+                plot_bgcolor='rgba(255,247,242,0.5)',
+                paper_bgcolor='#FFF7F2',
+                font=dict(color='#2C1735', size=12),
+                title_font=dict(size=16, color='#F29BB2', family='Baloo 2'),
                 xaxis=dict(
-                    title='Date', 
-                    gridcolor='#F5E6D3',
+                    title='Date',
+                    gridcolor='#FFE4F2',
                     showgrid=True
                 ),
                 yaxis=dict(
                     title='Revenue (£)',
-                    gridcolor='#F5E6D3',
+                    gridcolor='#FFE4F2',
                     showgrid=True
                 )
             )
             fig_revenue.update_traces(
-                line=dict(color='#C9A882', width=3),
+                line=dict(color='#F29BB2', width=3),
                 fill='tozeroy',
-                fillcolor='rgba(201, 168, 130, 0.2)'
+                fillcolor='rgba(242, 155, 178, 0.2)'
             )
             st.plotly_chart(fig_revenue, use_container_width=True)
 
@@ -140,7 +143,7 @@ def show_dashboard():
                 'amount': 'sum'
             }).reset_index().sort_values('quantity', ascending=False).head(10)
 
-            # Gold themed bar chart
+            # Pastel pink themed bar chart
             fig_items = px.bar(
                 top_items,
                 x='item',
@@ -149,24 +152,24 @@ def show_dashboard():
             )
             fig_items.update_layout(
                 height=400,
-                plot_bgcolor='rgba(255,250,245,0.5)',
-                paper_bgcolor='white',
-                font=dict(color='#5D4E37', size=12),
-                title_font=dict(size=16, color='#C9A882'),
+                plot_bgcolor='rgba(255,247,242,0.5)',
+                paper_bgcolor='#FFF7F2',
+                font=dict(color='#2C1735', size=12),
+                title_font=dict(size=16, color='#F29BB2', family='Baloo 2'),
                 xaxis=dict(
-                    title='Item', 
-                    gridcolor='#F5E6D3',
+                    title='Item',
+                    gridcolor='#FFE4F2',
                     tickangle=-45
                 ),
                 yaxis=dict(
-                    title='Units Sold', 
-                    gridcolor='#F5E6D3'
+                    title='Units Sold',
+                    gridcolor='#FFE4F2'
                 )
             )
             fig_items.update_traces(
                 marker=dict(
-                    color='#C9A882',
-                    line=dict(color='#F5E6D3', width=2)
+                    color='#F29BB2',
+                    line=dict(color='#FFE4F2', width=2)
                 )
             )
             st.plotly_chart(fig_items, use_container_width=True)

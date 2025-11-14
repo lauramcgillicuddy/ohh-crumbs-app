@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#F29BB2"          # strawberry icing
+backgroundColor = "#FFF7F2"       # cream
+secondaryBackgroundColor = "#FFE4F2"  # pale pink panel
+textColor = "#2C1735"             # deep plum
+font = "sans serif"

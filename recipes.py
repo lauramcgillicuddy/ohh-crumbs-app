@@ -2,9 +2,12 @@ import streamlit as st
 from database import get_session, close_session
 from models import Recipe, Ingredient, RecipeItem
 from utils import calculate_recipe_cost, calculate_profit_margin
+from styling import inject_custom_css, render_page_header
 
 def show_recipes():
-    st.title("📖 Recipe Database")
+    inject_custom_css()
+
+    render_page_header("📖 Recipe Database", "MANAGE YOUR MENU ITEMS")
     
     session = get_session()
     

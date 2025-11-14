@@ -1,4 +1,5 @@
 import streamlit as st
+from styling import inject_custom_css, render_page_header
 from database import get_session, close_session
 from models import Recipe, SalesCache, ProfitHistory
 from utils import calculate_profit_margin
@@ -10,7 +11,9 @@ from datetime import datetime, timedelta
 from pdf_reports import generate_profit_report
 
 def show_profit_analysis():
-    st.title("💰 Profit Analysis")
+    inject_custom_css()
+
+    render_page_header("💰 Profit Analysis", "TRACK YOUR MARGINS")
     
     session = get_session()
     

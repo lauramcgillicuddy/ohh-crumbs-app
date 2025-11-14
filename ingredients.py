@@ -2,9 +2,12 @@ import streamlit as st
 from database import get_session, close_session
 from models import Ingredient, Supplier
 from datetime import datetime
+from styling import inject_custom_css, render_page_header
 
 def show_ingredients():
-    st.title("🥖 Ingredient Management")
+    inject_custom_css()
+
+    render_page_header("🥖 Ingredient Management", "TRACK YOUR STOCK")
     
     session = get_session()
     
