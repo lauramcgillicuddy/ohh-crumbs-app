@@ -24,7 +24,8 @@ Thumbs.db
 
 # ---- Jupyter / Streamlit ----
 .ipynb_checkpoints/
-.streamlit/
+.streamlit/secrets.toml
+.streamlit/config.toml
 
 # ---- Data & secrets ----
 *.db

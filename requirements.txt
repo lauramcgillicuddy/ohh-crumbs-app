@@ -5,3 +5,4 @@ sqlalchemy
 requests
 reportlab
 fpdf2==2.*
+squareup
