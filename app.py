@@ -20,6 +20,10 @@ def gate():
     st.stop()
 gate()
 
+# --- Initialize database tables ---
+from database import init_db
+init_db()
+
 # --- Import your pages (top-level .py files) ---
 import dashboard, ingredients, inventory_alerts, profit_analysis, recipes, suppliers, square_setup
 
