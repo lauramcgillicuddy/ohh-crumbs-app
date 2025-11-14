@@ -8,3 +8,5 @@ reportlab
 fpdf2==2.*
 squareup
 streamlit-qrcode-scanner
+Pillow
+pytesseract
