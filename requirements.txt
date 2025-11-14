@@ -7,3 +7,4 @@ requests
 reportlab
 fpdf2==2.*
 squareup
+streamlit-qrcode-scanner
