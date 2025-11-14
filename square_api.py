@@ -20,9 +20,9 @@ class SquareAPI:
     def test_connection(self):
         if not self.is_configured:
             return False, "Square API credentials not configured"
-        
+
         try:
-            result = self.client.locations.list_locations()
+            result = self.client.locations.list()
             if result.is_success():
                 return True, "Connected successfully"
             else:
@@ -39,7 +39,7 @@ class SquareAPI:
             cursor = None
             
             while True:
-                result = self.client.catalog.list_catalog(types='ITEM', cursor=cursor)
+                result = self.client.catalog.list(types='ITEM', cursor=cursor)
                 
                 if result.is_success():
                     for obj in result.body.get('objects', []):
@@ -79,7 +79,7 @@ class SquareAPI:
             begin_time = (datetime.utcnow() - timedelta(days=days_back)).isoformat() + 'Z'
             end_time = datetime.utcnow().isoformat() + 'Z'
             
-            result = self.client.payments.list_payments(
+            result = self.client.payments.list(
                 begin_time=begin_time,
                 end_time=end_time,
                 location_id=self.location_id,
@@ -135,7 +135,7 @@ class SquareAPI:
                 if cursor:
                     body['cursor'] = cursor
                 
-                result = self.client.orders.search_orders(body=body)
+                result = self.client.orders.search(body=body)
                 
                 if result.is_success():
                     for order in result.body.get('orders', []):
