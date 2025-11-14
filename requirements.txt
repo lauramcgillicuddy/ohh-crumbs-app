@@ -10,3 +10,4 @@ squareup
 streamlit-qrcode-scanner
 Pillow
 pytesseract
+pdf2image
