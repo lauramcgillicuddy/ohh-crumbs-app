@@ -101,7 +101,7 @@ def parse_receipt_text(text: str) -> Dict:
                         # Filter out invalid item names
                         if (item_name and
                             len(item_name) > 2 and  # Skip very short names like "cm", "z"
-                            not item_name.lower() in ['cm', 'mm', 'kg', 'g', 'ml', 'l', 'oz', 'lb', 'z', 'vat', 'tax'] and
+                            item_name.lower() not in ['cm', 'mm', 'kg', 'g', 'ml', 'l', 'oz', 'lb', 'z', 'vat', 'tax'] and
                             net_amount > 0):
                             result['line_items'].append({
                                 'item_name': item_name,
@@ -129,7 +129,11 @@ def parse_receipt_text(text: str) -> Dict:
                             qty = 1.0
                             price = float(groups[1])
 
-                        if item_name and price > 0:
+                        # Filter out invalid item names
+                        if (item_name and
+                            len(item_name) > 2 and
+                            item_name.lower() not in ['cm', 'mm', 'kg', 'g', 'ml', 'l', 'oz', 'lb', 'z', 'vat', 'tax'] and
+                            price > 0):
                             result['line_items'].append({
                                 'item_name': item_name,
                                 'quantity': qty,
@@ -142,7 +146,11 @@ def parse_receipt_text(text: str) -> Dict:
                         # (item, price)
                         item_name = groups[0].strip()
                         price = float(groups[1])
-                        if item_name and price > 0:
+                        # Filter out invalid item names
+                        if (item_name and
+                            len(item_name) > 2 and
+                            item_name.lower() not in ['cm', 'mm', 'kg', 'g', 'ml', 'l', 'oz', 'lb', 'z', 'vat', 'tax'] and
+                            price > 0):
                             result['line_items'].append({
                                 'item_name': item_name,
                                 'quantity': 1.0,
