@@ -1,6 +1,6 @@
 import streamlit as st
 from database import get_session, close_session
-from utils import get_sales_summary, generate_business_recommendations
+from utils import get_sales_summary, generate_business_recommendations, auto_sync_square_sales
 from models import SalesCache, Recipe
 from utils import calculate_profit_margin
 from sqlalchemy import func
@@ -12,6 +12,11 @@ from pdf_reports import generate_sales_report
 
 def show_dashboard():
     st.markdown("<h1>Ohh Crumbs</h1><p style='text-align: center; color: #8B7355; font-size: 1rem; margin-top: -1rem; letter-spacing: 2px;'>CAKE AND CRUMBLE</p>", unsafe_allow_html=True)
+
+    # Auto-sync Square sales data (runs once per hour due to cache)
+    sync_result = auto_sync_square_sales(days_back=30)
+    if sync_result and sync_result.get('imported', 0) > 0:
+        st.toast(f"✅ Synced {sync_result['imported']} new sales from Square", icon="🔄")
 
     session = get_session()
 

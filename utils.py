@@ -2,10 +2,71 @@ from datetime import datetime, timedelta
 from sqlalchemy import func
 from models import Ingredient, Recipe, RecipeItem, SalesCache, DailyUsage
 import pandas as pd
+import streamlit as st
 
 def format_currency(amount):
     """Format amount as GBP currency"""
     return f"£{amount:,.2f}"
+
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def auto_sync_square_sales(days_back=30):
+    """Automatically sync sales data from Square on app startup (cached for 1 hour)"""
+    try:
+        from square_api import SquareAPI
+        from database import get_session, close_session
+
+        square_api = SquareAPI()
+
+        # Only run if Square is configured
+        if not square_api.is_configured:
+            return None
+
+        session = get_session()
+
+        try:
+            orders = square_api.get_orders(days_back=days_back)
+
+            if not orders:
+                return None
+
+            imported = 0
+
+            for order in orders:
+                try:
+                    unique_id = f"{order['order_id']}_{order['item_name']}"
+
+                    # Check if already imported
+                    existing = session.query(SalesCache).filter(
+                        SalesCache.square_payment_id == unique_id
+                    ).first()
+
+                    if not existing:
+                        new_sale = SalesCache(
+                            square_payment_id=unique_id,
+                            item_name=order['item_name'],
+                            quantity=order['quantity'],
+                            total_amount=order['total_amount'],
+                            timestamp=datetime.fromisoformat(order['created_at'].replace('Z', '+00:00'))
+                        )
+                        session.add(new_sale)
+                        imported += 1
+                except Exception:
+                    continue  # Skip failed orders silently
+
+            session.commit()
+
+            return {
+                'imported': imported,
+                'total_orders': len(orders),
+                'synced_at': datetime.utcnow()
+            }
+
+        finally:
+            close_session(session)
+
+    except Exception:
+        # Fail silently - don't break the app if Square sync fails
+        return None
 
 def calculate_recipe_cost(session, recipe_id):
     recipe = session.query(Recipe).filter_by(id=recipe_id).first()
