@@ -34,13 +34,13 @@ def show_dashboard():
         with col1:
             st.metric(
                 "Total Revenue",
-                f"${summary['total_revenue']:,.2f}"
+                f"£{summary['total_revenue']:,.2f}"
             )
 
         with col2:
             st.metric(
                 "Total Profit",
-                f"${summary['total_profit']:,.2f}"
+                f"£{summary['total_profit']:,.2f}"
             )
 
         with col3:
@@ -115,7 +115,7 @@ def show_dashboard():
                     showgrid=True
                 ),
                 yaxis=dict(
-                    title='Revenue ($)', 
+                    title='Revenue (£)',
                     gridcolor='#F5E6D3',
                     showgrid=True
                 )

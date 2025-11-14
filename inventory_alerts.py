@@ -123,9 +123,9 @@ def show_inventory_alerts():
                                 cost = qty * ing.cost_per_unit
                                 total_order_cost += cost
                                 
-                                st.write(f"- **{ing.name}**: {qty:.2f} {ing.unit} @ ${ing.cost_per_unit:.2f} = ${cost:.2f}")
+                                st.write(f"- **{ing.name}**: {qty:.2f} {ing.unit} @ £{ing.cost_per_unit:.2f} = £{cost:.2f}")
                             
-                            st.write(f"**Total Order Cost:** ${total_order_cost:.2f}")
+                            st.write(f"**Total Order Cost:** £{total_order_cost:.2f}")
                             st.write(f"**Delivery Time:** {supplier.lead_time_days} days")
                             
                             if st.button(f"✅ Create Order for {supplier.name}", key=f"order_{supplier_id}"):
