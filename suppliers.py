@@ -382,7 +382,6 @@ def show_suppliers():
                                                 unit='units',  # Default, user can edit later
                                                 cost_per_unit=item['unit_cost'],
                                                 current_stock=item['quantity'],
-                                                reorder_point=10,
                                                 supplier_id=supplier.id
                                             )
                                             session.add(ingredient)
