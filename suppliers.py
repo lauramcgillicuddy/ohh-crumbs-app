@@ -242,6 +242,15 @@ def show_suppliers():
                                     with st.expander(f"📝 Extracted Text from {uploaded_file.name}"):
                                         st.text(extracted_text)
 
+                                    # Show regex matches for debugging
+                                    if current_parsed and current_parsed.get('_debug_matches'):
+                                        with st.expander(f"🔍 Debug: Regex Matches from {uploaded_file.name}"):
+                                            for match_info in current_parsed['_debug_matches']:
+                                                st.write(f"**Pattern {match_info['pattern_idx']}** matched:")
+                                                st.write(f"Line: `{match_info['line']}`")
+                                                st.write(f"Groups: {match_info['groups']}")
+                                                st.divider()
+
                             if current_parsed:
                                 all_parsed_data.append(current_parsed)
                                 st.success(f"✅ {uploaded_file.name} parsed successfully!")
