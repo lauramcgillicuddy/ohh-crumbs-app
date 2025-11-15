@@ -66,8 +66,8 @@ def parse_receipt_text(text: str) -> Dict:
     # Extract line items (quantity, item name, unit price, total price)
     # Updated patterns to handle receipts with both unit price AND net amount
     item_patterns = [
-        # Pattern with product code, qty, qty, item name, unit price, unit desc, net amount (e.g., "A002 1 1 AB M/P Yeast (1kg packet) (SINGLE) 5.01 Packet 5.01 Z")
-        r'[A-Z]\d+\s+(\d+)\s+\d+\s+(.+?)\s+(\d+\.\d{2})\s+[A-Za-z]+\s+(\d+\.\d{2})\s+[A-Z]\s+\d+',
+        # Pattern with product code, qty, item name, unit price, unit desc, net amount (e.g., "A002 1 AB M/P Yeast (1kg packet) (SINGLE) 5.01 Packet 5.01 Z")
+        r'[A-Z]\d+\s+(\d+)\s+(.+?)\s+(\d+\.\d{2})\s+[A-Za-z]+\s+(\d+\.\d{2})\s+[A-Z]\s+\d+',
         # Pattern with qty, item name, unit price, and net amount (e.g., "10 Ardress Diced Apple Pie Mix 19.80 10kg 198.00")
         r'(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)?\s*([A-Za-z][A-Za-z\s\-\'&.]+?)\s+(\d+\.\d{2})\s+(?:\d+(?:\.\d+)?)?(?:kg|g|l|ml|lb|oz|x|pcs|cm|mm)?\s+(\d+\.\d{2})',
         # Pattern with qty, item, single price (e.g., "2kg Flour 3.50")
