@@ -66,6 +66,8 @@ def parse_receipt_text(text: str) -> Dict:
     # Extract line items (quantity, item name, unit price, total price)
     # Updated patterns to handle receipts with both unit price AND net amount
     item_patterns = [
+        # Pattern with product code, qty, qty, item name, unit price, unit desc, net amount (e.g., "A002 1 1 AB M/P Yeast (1kg packet) (SINGLE) 5.01 Packet 5.01 Z")
+        r'[A-Z]\d+\s+(\d+(?:\.\d+)?)\s+\d+(?:\.\d+)?\s+([A-Za-z][A-Za-z0-9\s\-\'&./()]+?)\s+(\d+\.\d{2})\s+[A-Za-z]+\s+(\d+\.\d{2})',
         # Pattern with qty, item name, unit price, and net amount (e.g., "10 Ardress Diced Apple Pie Mix 19.80 10kg 198.00")
         r'(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)?\s*([A-Za-z][A-Za-z\s\-\'&.]+?)\s+(\d+\.\d{2})\s+(?:\d+(?:\.\d+)?)?(?:kg|g|l|ml|lb|oz|x|pcs|cm|mm)?\s+(\d+\.\d{2})',
         # Pattern with qty, item, single price (e.g., "2kg Flour 3.50")
@@ -108,6 +110,26 @@ def parse_receipt_text(text: str) -> Dict:
                                 'quantity': qty,
                                 'unit_cost': unit_price,  # Use the unit price directly
                                 'total_cost': net_amount   # Use the net amount as total
+                            })
+                            break
+
+                    elif len(groups) == 4:
+                        # Format: qty, item_name, unit_price, net_amount (with product code prefix)
+                        qty = float(groups[0])
+                        item_name = groups[1].strip()
+                        unit_price = float(groups[2])
+                        net_amount = float(groups[3])
+
+                        # Filter out invalid item names
+                        if (item_name and
+                            len(item_name) > 2 and
+                            item_name.lower() not in ['cm', 'mm', 'kg', 'g', 'ml', 'l', 'oz', 'lb', 'z', 'vat', 'tax'] and
+                            net_amount > 0):
+                            result['line_items'].append({
+                                'item_name': item_name,
+                                'quantity': qty,
+                                'unit_cost': unit_price,
+                                'total_cost': net_amount
                             })
                             break
 
