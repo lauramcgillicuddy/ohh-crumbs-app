@@ -335,6 +335,7 @@ def show_suppliers():
                                         Supplier.name.ilike(f"%{parsed_data['vendor_name']}%")
                                     ).first()
 
+                                    supplier_was_new = False
                                     if not supplier:
                                         # Create new supplier
                                         supplier = Supplier(
@@ -346,6 +347,7 @@ def show_suppliers():
                                         )
                                         session.add(supplier)
                                         session.flush()  # Get supplier ID
+                                        supplier_was_new = True
 
                                     # Create supplier order
                                     order_date = parsed_data.get('order_date') or datetime.utcnow()
@@ -364,6 +366,9 @@ def show_suppliers():
                                     session.flush()
 
                                     # Create ingredients and order items
+                                    new_ingredients = 0
+                                    existing_ingredients = 0
+
                                     for item in parsed_data['line_items']:
                                         # Check if ingredient exists
                                         ingredient = session.query(Ingredient).filter(
@@ -382,10 +387,12 @@ def show_suppliers():
                                             )
                                             session.add(ingredient)
                                             session.flush()
+                                            new_ingredients += 1
                                         else:
                                             # Update stock
                                             ingredient.current_stock += item['quantity']
                                             ingredient.cost_per_unit = item['unit_cost']
+                                            existing_ingredients += 1
 
                                         # Create order item
                                         order_item = SupplierOrderItem(
@@ -399,7 +406,22 @@ def show_suppliers():
 
                                     session.commit()
 
-                                    st.success(f"✅ Saved! Created {len(parsed_data['line_items'])} ingredients and supplier order #{new_order.id}")
+                                    # Build detailed success message
+                                    success_msg = f"✅ Saved supplier order #{new_order.id}!\n\n"
+
+                                    if supplier_was_new:
+                                        success_msg += f"🆕 **New supplier created:** {supplier.name}\n\n"
+                                    else:
+                                        success_msg += f"✓ **Existing supplier found:** {supplier.name}\n\n"
+
+                                    if new_ingredients > 0:
+                                        success_msg += f"🆕 **{new_ingredients} new ingredient(s)** added\n\n"
+                                    if existing_ingredients > 0:
+                                        success_msg += f"✓ **{existing_ingredients} existing ingredient(s)** updated\n\n"
+
+                                    success_msg += f"📦 Total items: {len(parsed_data['line_items'])}"
+
+                                    st.success(success_msg)
 
                                     # Clear parsed data
                                     if 'parsed_receipt_data' in st.session_state:
