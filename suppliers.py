@@ -242,13 +242,26 @@ def show_suppliers():
                                     with st.expander(f"📝 Extracted Text from {uploaded_file.name}"):
                                         st.text(extracted_text)
 
+                                    # Show vendor name candidates for debugging
+                                    if current_parsed and current_parsed.get('_debug_vendor_candidates'):
+                                        with st.expander(f"🏢 Debug: Vendor Name Candidates from {uploaded_file.name}"):
+                                            st.write(f"**Selected:** {current_parsed.get('vendor_name', 'None')}")
+                                            st.write("**All candidates found:**")
+                                            for idx, name, line in current_parsed['_debug_vendor_candidates']:
+                                                st.write(f"- Line {idx}: `{name}`")
+                                                st.caption(f"Full line: {line}")
+
                                     # Show regex matches for debugging
                                     if current_parsed and current_parsed.get('_debug_matches'):
-                                        with st.expander(f"🔍 Debug: Regex Matches from {uploaded_file.name}"):
+                                        with st.expander(f"🔍 Debug: Line Item Matches from {uploaded_file.name}"):
+                                            st.write(f"**Total items matched: {len(current_parsed.get('line_items', []))}**")
+                                            st.divider()
                                             for match_info in current_parsed['_debug_matches']:
-                                                st.write(f"**Pattern {match_info['pattern_idx']}** matched:")
-                                                st.write(f"Line: `{match_info['line']}`")
-                                                st.write(f"Groups: {match_info['groups']}")
+                                                st.write(f"**Pattern {match_info.get('pattern_idx', 'N/A')}** matched:")
+                                                st.write(f"Line: `{match_info.get('line', 'N/A')}`")
+                                                st.write(f"Groups: {match_info.get('groups', 'N/A')}")
+                                                if 'error' in match_info:
+                                                    st.error(f"Parse error: {match_info['error']}")
                                                 st.divider()
 
                             if current_parsed:

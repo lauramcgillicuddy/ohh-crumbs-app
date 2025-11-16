@@ -20,9 +20,45 @@ def parse_receipt_text(text: str) -> Dict:
         'total_amount': None
     }
 
-    # Common vendor name patterns (usually at the top)
-    if lines:
-        result['vendor_name'] = lines[0]
+    # Extract vendor name using company-style pattern
+    # Look for company names with Ltd, Limited, LLP, PLC
+    company_pattern = r'([A-Z][A-Za-z&.\s]+?\s(?:Ltd|Limited|LLP|PLC))'
+
+    # Avoid false matches from page numbers, emails, etc.
+    avoid_patterns = [
+        r'Page\s+\d+\s+of\s+\d+',
+        r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}',
+    ]
+
+    # Find all company name candidates
+    company_matches = []
+    for idx, line in enumerate(lines):
+        # Skip lines with patterns to avoid
+        if any(re.search(avoid, line, re.IGNORECASE) for avoid in avoid_patterns):
+            continue
+
+        match = re.search(company_pattern, line)
+        if match:
+            company_name = match.group(1).strip()
+            # Store with line index to prefer those near contact info
+            company_matches.append((idx, company_name, line))
+
+    # Choose the best company name (prefer one near email/phone)
+    if company_matches:
+        # Find email/phone line indices
+        email_phone_indices = []
+        for idx, line in enumerate(lines):
+            if re.search(r'@|phone|tel|sales|accounts', line, re.IGNORECASE):
+                email_phone_indices.append(idx)
+
+        # Pick company name closest to contact info
+        if email_phone_indices:
+            best_match = min(company_matches,
+                           key=lambda x: min(abs(x[0] - ei) for ei in email_phone_indices))
+            result['vendor_name'] = best_match[1]
+        else:
+            # No contact info found, just use first match
+            result['vendor_name'] = company_matches[0][1]
 
     # Extract email
     email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
@@ -70,138 +106,68 @@ def parse_receipt_text(text: str) -> Dict:
                 except:
                     pass
 
-    # Extract line items using table-based approach
-    # Find the header row that contains "Description" and "Price"
+    # Extract line items using robust regex pattern
+    # Format: CODE QTY_ORD QTY_DEL DESCRIPTION PRICE PACK NET_AMOUNT
+    # Example: "A036 10 10 Adress Diced Apple Pie Mix 19.80 10kg 198.00"
+    # Example: "A8102 2 2 Pidy Sablee Fluted Tartlet 9.5cm 38.94 108pcs 77.88"
+    # Example: "G3450 1 1 Mather's White Mallow Russe 45.20 12.5kg 45.20"
+
     matched_lines = []  # Debug: track which lines matched
-    header_idx = -1
 
-    for idx, line in enumerate(lines):
-        if re.search(r'\bDescription\b.*\bPrice\b', line, re.IGNORECASE):
-            header_idx = idx
-            break
+    # Use verbose regex with named groups for clarity
+    line_item_pattern = r'''(?x)  # Enable verbose mode
+        ^(?P<code>[A-Z]\d{3,5})\s+      # Product code: letter + 3-5 digits
+        (?P<qty_ord>\d+)\s+              # Quantity ordered
+        (?P<qty_del>\d+)\s+              # Quantity delivered
+        (?P<desc>.+?)\s+                 # Description (non-greedy)
+        (?P<price>£?\d+\.\d{2})\s+       # Unit price
+        (?P<pack>[0-9.]+[A-Za-z%]+)\s+   # Pack size (e.g., 10kg, 108pcs)
+        (?P<net>£?\d+\.\d{2})\s*$        # Net amount
+    '''
 
-    # If we found a header, parse items until we hit "Total"
-    if header_idx >= 0:
-        in_items_section = True
-        for idx in range(header_idx + 1, len(lines)):
-            line = lines[idx]
+    # Apply to the full text with multiline mode
+    full_text = '\n'.join(lines)
+    for match in re.finditer(line_item_pattern, full_text, re.MULTILINE | re.VERBOSE):
+        matched_dict = match.groupdict()
 
-            # Stop at total/subtotal lines
-            if re.search(r'\b(total|subtotal|vat code|rate %)\b', line, re.IGNORECASE):
-                in_items_section = False
-                break
+        # Debug: store match
+        matched_lines.append({
+            'line': match.group(0),
+            'pattern_idx': 0,
+            'groups': matched_dict
+        })
 
-            # Skip empty or very short lines
-            if len(line.strip()) < 5:
-                continue
+        try:
+            # Extract values
+            product_code = matched_dict['code']
+            qty = float(matched_dict['qty_ord'])
+            item_name = matched_dict['desc'].strip()
+            # Remove £ symbol if present
+            unit_price_str = matched_dict['price'].replace('£', '')
+            net_amount_str = matched_dict['net'].replace('£', '')
+            unit_price = float(unit_price_str)
+            net_amount = float(net_amount_str)
+            pack_size = matched_dict['pack']
 
-            # Try to parse as invoice line item
-            # Format: CODE QTY_ORD QTY_DEL DESCRIPTION PRICE PACK NET_AMOUNT [VAT_CODE] [PRODUCT_CODE]
-            # Example: "A002 1 1 AB M/P Yeast (1kg packet) (SINGLE) 5.01 Packet 5.01 Z 2102103900"
-            # Example: "A2 6 6 Pidy Mini Trendy Shell Rd Sweet AB5cm 10.62 6x135g 63.72 Z 1905909900"
-
-            # More flexible pattern that captures:
-            # - Product code (optional letter+digits)
-            # - Qty ordered (digits)
-            # - Qty delivered (optional, often same as ordered)
-            # - Description (everything until we hit the first price)
-            # - Unit price (decimal)
-            # - Pack description (optional word)
-            # - Net amount (decimal)
-            item_pattern = r'^([A-Z]+\d+)?\s*(\d+)\s+\d*\s*(.+?)\s+(\d+\.\d{2})\s+(?:[A-Za-z0-9]+\s+)?(\d+\.\d{2})'
-
-            match = re.search(item_pattern, line, re.IGNORECASE)
-            if match:
-                groups = match.groups()
-
-                # Debug: store match
-                matched_lines.append({
-                    'line': line,
-                    'pattern_idx': 0,  # Using new table-based pattern
-                    'groups': groups
+            # Filter out invalid item names
+            if (item_name and
+                len(item_name) > 2 and
+                item_name.lower() not in ['cm', 'mm', 'kg', 'g', 'ml', 'l', 'oz', 'lb', 'z', 'vat', 'tax'] and
+                net_amount > 0):
+                result['line_items'].append({
+                    'item_name': item_name,
+                    'quantity': qty,
+                    'unit_cost': unit_price,
+                    'total_cost': net_amount
                 })
-
-                try:
-                    product_code = groups[0] if groups[0] else ""
-                    qty = float(groups[1])
-                    item_name = groups[2].strip()
-                    unit_price = float(groups[3])
-                    net_amount = float(groups[4])
-
-                    # Filter out invalid item names
-                    if (item_name and
-                        len(item_name) > 2 and
-                        item_name.lower() not in ['cm', 'mm', 'kg', 'g', 'ml', 'l', 'oz', 'lb', 'z', 'vat', 'tax'] and
-                        net_amount > 0):
-                        result['line_items'].append({
-                            'item_name': item_name,
-                            'quantity': qty,
-                            'unit_cost': unit_price,
-                            'total_cost': net_amount
-                        })
-                except (ValueError, IndexError, TypeError) as e:
-                    # Debug: track failed parse attempts
-                    matched_lines.append({
-                        'line': line,
-                        'pattern_idx': -1,
-                        'groups': None,
-                        'error': str(e)
-                    })
-                    continue
-
-    # Fallback: if no header found, use old pattern-matching approach
-    else:
-        item_patterns = [
-            # Pattern with product code, qty, item name, unit price, unit desc, net amount
-            r'[A-Z]\d+\s+(\d+)\s+(.+?)\s+(\d+\.\d{2})\s+[A-Za-z]+\s+(\d+\.\d{2})\s+[A-Z]\s+\d+',
-            # Pattern with qty, item name, unit price, and net amount
-            r'(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)?\s*([A-Za-z][A-Za-z\s\-\'&.]+?)\s+(\d+\.\d{2})\s+(?:\d+(?:\.\d+)?)?(?:kg|g|l|ml|lb|oz|x|pcs|cm|mm)?\s+(\d+\.\d{2})',
-        ]
-
-        for line in lines:
-            # Skip header/footer lines
-            if any(keyword in line.lower() for keyword in ['total', 'subtotal', 'vat', 'invoice', 'receipt']):
-                continue
-
-            if len(line.strip()) < 5:
-                continue
-
-            for pattern_idx, pattern in enumerate(item_patterns):
-                match = re.search(pattern, line, re.IGNORECASE)
-                if match:
-                    groups = match.groups()
-                    matched_lines.append({
-                        'line': line,
-                        'pattern_idx': pattern_idx,
-                        'groups': groups
-                    })
-
-                    try:
-                        if len(groups) == 4:
-                            qty = float(groups[0])
-                            item_name = groups[1].strip()
-                            unit_price = float(groups[2])
-                            net_amount = float(groups[3])
-                        elif len(groups) == 5:
-                            qty = float(groups[0])
-                            item_name = groups[2].strip()
-                            unit_price = float(groups[3])
-                            net_amount = float(groups[4])
-                        else:
-                            continue
-
-                        if (item_name and len(item_name) > 2 and
-                            item_name.lower() not in ['cm', 'mm', 'kg', 'g', 'ml', 'l', 'oz', 'lb', 'z', 'vat', 'tax'] and
-                            net_amount > 0):
-                            result['line_items'].append({
-                                'item_name': item_name,
-                                'quantity': qty,
-                                'unit_cost': unit_price,
-                                'total_cost': net_amount
-                            })
-                            break
-                    except (ValueError, IndexError):
-                        continue
+        except (ValueError, IndexError, TypeError) as e:
+            # Debug: track failed parse attempts
+            matched_lines.append({
+                'line': match.group(0),
+                'pattern_idx': -1,
+                'groups': matched_dict,
+                'error': str(e)
+            })
 
     # Extract total
     total_pattern = r'(?:total|grand\s+total|amount\s+due)[\s:]*£?(\d+\.\d{2})'
@@ -216,6 +182,7 @@ def parse_receipt_text(text: str) -> Dict:
 
     # Add debug info
     result['_debug_matches'] = matched_lines
+    result['_debug_vendor_candidates'] = company_matches if 'company_matches' in locals() else []
 
     return result
 
