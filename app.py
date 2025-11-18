@@ -25,12 +25,12 @@ from database import init_db
 init_db()
 
 # --- Import your pages (top-level .py files) ---
-import dashboard, ingredients, inventory_alerts, profit_analysis, recipes, suppliers, square_setup
+import dashboard, ingredients, inventory, inventory_alerts, profit_analysis, recipes, suppliers, square_setup
 
 st.sidebar.title("🍰 Ohh Crumbs")
 page = st.sidebar.radio(
     "Go to",
-    ["🏠 Dashboard","🥖 Ingredients","📖 Recipes","🔔 Inventory Alerts","💰 Profit Analysis","📦 Suppliers","🔗 Square Setup"],
+    ["🏠 Dashboard","🥖 Ingredients","📖 Recipes","📊 Inventory Tracking","🔔 Inventory Alerts","💰 Profit Analysis","📦 Suppliers","🔗 Square Setup"],
     label_visibility="collapsed",
 )
 
@@ -43,6 +43,7 @@ def call(mod, func):
 if page.startswith("🏠"): call(dashboard, "show_dashboard")
 elif page.startswith("🥖"): call(ingredients, "show_ingredients")
 elif page.startswith("📖"): call(recipes, "show_recipes")
+elif page.startswith("📊"): call(inventory, "show_inventory")
 elif page.startswith("🔔"): call(inventory_alerts, "show_inventory_alerts")
 elif page.startswith("💰"): call(profit_analysis, "show_profit_analysis")
 elif page.startswith("📦"): call(suppliers, "show_suppliers")
