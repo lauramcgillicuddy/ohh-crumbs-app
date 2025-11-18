@@ -322,11 +322,12 @@ Return as JSON with this structure:
 
 def extract_text_from_image(image_bytes: bytes, filename: str = "") -> str:
     """
-    Extract text from image or PDF using pytesseract OCR.
+    Extract text from image or PDF using pytesseract OCR with preprocessing.
     """
     try:
-        from PIL import Image
+        from PIL import Image, ImageEnhance, ImageFilter
         import io
+        import numpy as np
 
         # Check if it's a PDF
         if filename.lower().endswith('.pdf'):
@@ -340,11 +341,13 @@ def extract_text_from_image(image_bytes: bytes, filename: str = "") -> str:
                     import pytesseract
                     text = ""
                     for img in images:
-                        # Use invoice-optimized Tesseract config
+                        # Preprocess image
+                        img = preprocess_image_for_ocr(img)
+                        # Use recipe-optimized Tesseract config
                         text += pytesseract.image_to_string(
                             img,
                             lang="eng",
-                            config="--oem 3 --psm 6"  # LSTM OCR, assume uniform block of text
+                            config="--oem 3 --psm 4"  # LSTM OCR, assume single column
                         ) + "\n"
                     return text
                 except ImportError:
@@ -367,11 +370,18 @@ def extract_text_from_image(image_bytes: bytes, filename: str = "") -> str:
                 # Try to use pytesseract
                 try:
                     import pytesseract
-                    # Use invoice-optimized Tesseract config
+
+                    # Preprocess image for better OCR
+                    image = preprocess_image_for_ocr(image)
+
+                    # Use recipe-optimized Tesseract config
+                    # PSM 4 = single column of text (good for recipes)
+                    # PSM 6 = uniform block of text
+                    # PSM 11 = sparse text, find as much as possible
                     text = pytesseract.image_to_string(
                         image,
                         lang="eng",
-                        config="--oem 3 --psm 6"  # LSTM OCR, assume uniform block of text
+                        config="--oem 3 --psm 4"  # Single column works best for recipes
                     )
                     return text
                 except ImportError:
@@ -385,3 +395,33 @@ def extract_text_from_image(image_bytes: bytes, filename: str = "") -> str:
     except Exception as e:
         st.error(f"Error extracting text: {str(e)}")
         return ""
+
+
+def preprocess_image_for_ocr(image: 'Image.Image') -> 'Image.Image':
+    """
+    Preprocess image to improve OCR accuracy.
+    - Resize to optimal size
+    - Increase contrast
+    - Sharpen
+    - Convert to grayscale
+    """
+    from PIL import ImageEnhance, ImageFilter
+
+    # Resize image if too large (optimal OCR is around 300 DPI)
+    max_dimension = 2000
+    if max(image.size) > max_dimension:
+        ratio = max_dimension / max(image.size)
+        new_size = tuple(int(dim * ratio) for dim in image.size)
+        image = image.resize(new_size, Image.Resampling.LANCZOS)
+
+    # Convert to grayscale
+    image = image.convert('L')
+
+    # Increase contrast
+    enhancer = ImageEnhance.Contrast(image)
+    image = enhancer.enhance(2.0)
+
+    # Sharpen
+    image = image.filter(ImageFilter.SHARPEN)
+
+    return image
