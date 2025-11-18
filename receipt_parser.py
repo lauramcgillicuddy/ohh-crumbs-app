@@ -374,15 +374,27 @@ def extract_text_from_image(image_bytes: bytes, filename: str = "") -> str:
                     # Preprocess image for better OCR
                     image = preprocess_image_for_ocr(image)
 
-                    # Use recipe-optimized Tesseract config
-                    # PSM 4 = single column of text (good for recipes)
+                    # Try multiple PSM modes to find best result
+                    # PSM 3 = fully automatic page segmentation (default)
+                    # PSM 4 = single column of text
                     # PSM 6 = uniform block of text
                     # PSM 11 = sparse text, find as much as possible
+
+                    # Try PSM 6 first (works well for recipe cards)
                     text = pytesseract.image_to_string(
                         image,
                         lang="eng",
-                        config="--oem 3 --psm 4"  # Single column works best for recipes
+                        config="--oem 3 --psm 6"  # Uniform block of text
                     )
+
+                    # If result is too short, try PSM 3 (automatic)
+                    if len(text.strip()) < 50:
+                        text = pytesseract.image_to_string(
+                            image,
+                            lang="eng",
+                            config="--oem 3 --psm 3"  # Fully automatic
+                        )
+
                     return text
                 except ImportError:
                     st.warning("pytesseract not installed. OCR not available. Please add to Streamlit secrets: OPENAI_API_KEY for AI parsing.")
@@ -401,7 +413,7 @@ def preprocess_image_for_ocr(image: 'Image.Image') -> 'Image.Image':
     """
     Preprocess image to improve OCR accuracy.
     - Resize to optimal size
-    - Increase contrast
+    - Increase contrast (moderate)
     - Sharpen
     - Convert to grayscale
     """
@@ -417,11 +429,11 @@ def preprocess_image_for_ocr(image: 'Image.Image') -> 'Image.Image':
     # Convert to grayscale
     image = image.convert('L')
 
-    # Increase contrast
+    # Increase contrast (reduced from 2.0 to 1.5 for less aggressive processing)
     enhancer = ImageEnhance.Contrast(image)
-    image = enhancer.enhance(2.0)
+    image = enhancer.enhance(1.5)
 
-    # Sharpen
+    # Sharpen (less aggressive)
     image = image.filter(ImageFilter.SHARPEN)
 
     return image
