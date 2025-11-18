@@ -311,7 +311,15 @@ def show_suppliers():
                             # Display only the required columns
                             display_items = []
                             for item in parsed_data['line_items']:
+                                # Check if item already exists in database
+                                existing_ingredient = session.query(Ingredient).filter(
+                                    Ingredient.name.ilike(f"%{item.get('item_name', '')}%")
+                                ).first()
+
+                                status = "✓ Exists" if existing_ingredient else "New"
+
                                 display_items.append({
+                                    'Status': status,
                                     'Qty Ord': item.get('quantity', 1.0),
                                     'Description': item.get('item_name', ''),
                                     'Price': f"£{item.get('unit_cost', 0):.2f}",

@@ -131,7 +131,7 @@ def parse_receipt_text(text: str) -> Dict:
         (?P<qty_del>\d+)\s+              # Quantity delivered
         (?P<desc>.+?)\s+                 # Description (non-greedy)
         (?P<price>£?\d+.\d{2})\s+        # Unit price (. = any char for OCR tolerance)
-        (?P<pack>[0-9.]+[A-Za-z%]+)\s+   # Pack size (e.g., 10kg, 108pcs)
+        (?P<pack>\S+)\s+                 # Pack size (any format: 10kg, 108pcs, Packet, Each, etc.)
         (?P<net>£?\d+.\d{2})             # Net amount (. = any char for OCR tolerance)
         (?:\s+[A-Z]\s+\d+)?              # Optional: VAT code and commodity code
         \s*$                             # End of line
