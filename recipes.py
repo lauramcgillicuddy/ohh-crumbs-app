@@ -3,6 +3,7 @@ from database import get_session, close_session
 from models import Recipe, Ingredient, RecipeItem
 from utils import calculate_recipe_cost, calculate_profit_margin
 from styling import inject_custom_css, render_page_header
+from unit_conversions import BAKING_CONVERSIONS
 import pandas as pd
 
 def show_recipes():
@@ -95,14 +96,30 @@ def show_recipes():
                             
                             if ingredients:
                                 with st.form(key=f"add_ingredient_to_recipe_{recipe.id}"):
-                                    ingredient_id = st.selectbox(
-                                        "Select Ingredient",
-                                        options=[ing.id for ing in ingredients],
-                                        format_func=lambda x: next(ing.name for ing in ingredients if ing.id == x)
-                                    )
-                                    
-                                    quantity = st.number_input("Quantity", min_value=0.01, step=0.1, value=1.0)
-                                    
+                                    col_ing, col_qty, col_unit = st.columns([2, 1, 1])
+
+                                    with col_ing:
+                                        ingredient_id = st.selectbox(
+                                            "Select Ingredient",
+                                            options=[ing.id for ing in ingredients],
+                                            format_func=lambda x: next(ing.name for ing in ingredients if ing.id == x)
+                                        )
+
+                                    # Get selected ingredient to show unit
+                                    selected_ingredient = next(ing for ing in ingredients if ing.id == ingredient_id)
+
+                                    with col_qty:
+                                        quantity = st.number_input("Quantity", min_value=0.01, step=0.1, value=1.0)
+
+                                    with col_unit:
+                                        st.text_input(
+                                            "Unit",
+                                            value=selected_ingredient.unit,
+                                            disabled=True,
+                                            key=f"edit_recipe_unit_{recipe.id}",
+                                            help=f"Measured in {selected_ingredient.unit}"
+                                        )
+
                                     if st.form_submit_button("➕ Add to Recipe"):
                                         existing_item = session.query(RecipeItem).filter_by(
                                             recipe_id=recipe.id,
@@ -150,6 +167,11 @@ def show_recipes():
                 st.warning("⚠️ You need to add ingredients first before creating recipes!")
                 st.info("Go to the 'Ingredient Management' page to add ingredients.")
             else:
+                # Conversion reference
+                with st.expander("📏 Unit Conversion Reference"):
+                    st.markdown(BAKING_CONVERSIONS)
+                    st.info("💡 **Tip:** Enter quantities in the same unit as the ingredient (shown in the 'Unit' column)")
+
                 with st.form("add_recipe_form"):
                     recipe_name = st.text_input("Recipe Name *", placeholder="e.g., Chocolate Chip Cookie")
                     
@@ -174,8 +196,8 @@ def show_recipes():
                     
                     for i in range(int(num_ingredients)):
                         st.write(f"**Ingredient #{i+1}**")
-                        col_ing, col_qty = st.columns(2)
-                        
+                        col_ing, col_qty, col_unit = st.columns([2, 1, 1])
+
                         with col_ing:
                             ingredient_id = st.selectbox(
                                 f"Ingredient",
@@ -183,7 +205,10 @@ def show_recipes():
                                 format_func=lambda x: next(ing.name for ing in ingredients if ing.id == x),
                                 key=f"new_recipe_ing_{i}"
                             )
-                        
+
+                        # Get the selected ingredient to show its unit
+                        selected_ing = next(ing for ing in ingredients if ing.id == ingredient_id)
+
                         with col_qty:
                             quantity = st.number_input(
                                 f"Quantity",
@@ -192,7 +217,16 @@ def show_recipes():
                                 value=1.0,
                                 key=f"new_recipe_qty_{i}"
                             )
-                        
+
+                        with col_unit:
+                            st.text_input(
+                                "Unit",
+                                value=selected_ing.unit,
+                                disabled=True,
+                                key=f"new_recipe_unit_{i}",
+                                help=f"This ingredient is measured in {selected_ing.unit}"
+                            )
+
                         ingredient_selections.append({'id': ingredient_id, 'quantity': quantity})
                     
                     submitted = st.form_submit_button("➕ Create Recipe")

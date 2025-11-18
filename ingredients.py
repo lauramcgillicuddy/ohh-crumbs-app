@@ -3,6 +3,7 @@ from database import get_session, close_session
 from models import Ingredient, Supplier
 from datetime import datetime
 from styling import inject_custom_css, render_page_header
+from unit_conversions import BAKING_CONVERSIONS
 
 def show_ingredients():
     inject_custom_css()
@@ -111,7 +112,11 @@ def show_ingredients():
         
         with tab2:
             st.subheader("Add New Ingredient")
-            
+
+            # Conversion reference
+            with st.expander("📏 Unit Conversion Reference"):
+                st.markdown(BAKING_CONVERSIONS)
+
             with st.form("add_ingredient_form"):
                 name = st.text_input("Ingredient Name *", placeholder="e.g., All-Purpose Flour")
                 
