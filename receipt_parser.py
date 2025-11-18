@@ -120,13 +120,31 @@ def parse_receipt_text(text: str) -> Dict:
         (?P<qty_ord>\d+)\s+              # Quantity ordered
         (?P<qty_del>\d+)\s+              # Quantity delivered
         (?P<desc>.+?)\s+                 # Description (non-greedy)
-        (?P<price>£?\d+\.\d{2})\s+       # Unit price
+        (?P<price>£?\d+.\d{2})\s+        # Unit price (. = any char for OCR tolerance)
         (?P<pack>[0-9.]+[A-Za-z%]+)\s+   # Pack size (e.g., 10kg, 108pcs)
-        (?P<net>£?\d+\.\d{2})\s*$        # Net amount
+        (?P<net>£?\d+.\d{2})\s*$         # Net amount (. = any char for OCR tolerance)
     '''
 
     # Apply to the full text with multiline mode
     full_text = '\n'.join(lines)
+
+    # Debug: Store search info
+    matched_lines.append({
+        'pattern_idx': 'DEBUG',
+        'line': f'Searching {len(lines)} lines for pattern',
+        'groups': {'total_lines': len(lines), 'full_text_length': len(full_text)}
+    })
+
+    # Debug: Show sample lines that look like they might be items
+    for idx, line in enumerate(lines[:50]):  # First 50 lines
+        # Look for lines that start with a letter and digit (product codes)
+        if re.match(r'^[A-Z]\d', line):
+            matched_lines.append({
+                'pattern_idx': 'CANDIDATE',
+                'line': f'Line {idx}: {line}',
+                'groups': {'might_be_item': True}
+            })
+
     for match in re.finditer(line_item_pattern, full_text, re.MULTILINE | re.VERBOSE):
         matched_dict = match.groupdict()
 
