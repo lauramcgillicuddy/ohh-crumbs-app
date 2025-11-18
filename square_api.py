@@ -41,10 +41,21 @@ class SquareAPI:
             while True:
                 result = self.client.catalog.list(types='ITEM', cursor=cursor)
 
+                # Debug: Check what we got back
+                if hasattr(result, 'objects') and result.objects:
+                    st.info(f"Found {len(result.objects)} catalog objects")
+                else:
+                    st.warning("No catalog objects found in Square. Make sure you have items in your Square catalog.")
+
                 objects = result.objects if hasattr(result, 'objects') else []
                 for obj in objects:
                     item_data = obj.item_data if hasattr(obj, 'item_data') else {}
                     variations = item_data.variations if hasattr(item_data, 'variations') else []
+
+                    # If no variations, skip
+                    if not variations:
+                        st.warning(f"Item '{item_data.name if hasattr(item_data, 'name') else 'Unknown'}' has no variations (pricing). Skipping.")
+                        continue
 
                     for variation in variations:
                         variation_data = variation.item_variation_data if hasattr(variation, 'item_variation_data') else None
@@ -63,6 +74,12 @@ class SquareAPI:
                 cursor = result.cursor if hasattr(result, 'cursor') else None
                 if not cursor:
                     break
+
+            if len(items) == 0:
+                st.warning("⚠️ No items with pricing found in Square catalog. Make sure you have:")
+                st.write("1. Created items in your Square Dashboard")
+                st.write("2. Added prices to those items")
+                st.write("3. Items are not archived")
 
             return items
 
