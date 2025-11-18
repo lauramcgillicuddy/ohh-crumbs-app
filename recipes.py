@@ -3,6 +3,8 @@ from database import get_session, close_session
 from models import Recipe, Ingredient, RecipeItem
 from utils import calculate_recipe_cost, calculate_profit_margin
 from styling import inject_custom_css, render_page_header
+from recipe_ocr_parser import parse_recipe_from_image
+import pandas as pd
 
 def show_recipes():
     inject_custom_css()
@@ -142,13 +144,140 @@ def show_recipes():
         
         with tab2:
             st.subheader("Create New Recipe")
-            
+
             ingredients = session.query(Ingredient).order_by(Ingredient.name).all()
-            
+
             if not ingredients:
                 st.warning("⚠️ You need to add ingredients first before creating recipes!")
                 st.info("Go to the 'Ingredient Management' page to add ingredients.")
             else:
+                # OCR Recipe Image Upload Section
+                st.markdown("### 📸 Option 1: Scan Recipe Image")
+                st.info("Upload a photo of your recipe to automatically extract ingredients!")
+
+                uploaded_file = st.file_uploader(
+                    "Upload Recipe Image",
+                    type=['png', 'jpg', 'jpeg', 'pdf'],
+                    key="recipe_image_upload",
+                    help="Take a photo of your recipe card or printed recipe"
+                )
+
+                if uploaded_file is not None:
+                    # Display uploaded image
+                    if uploaded_file.type.startswith('image'):
+                        st.image(uploaded_file, caption="Uploaded Recipe", use_container_width=True)
+
+                    # Process with OCR
+                    if st.button("🔍 Extract Ingredients from Image", type="primary"):
+                        with st.spinner("Reading recipe image..."):
+                            try:
+                                image_bytes = uploaded_file.read()
+                                uploaded_file.seek(0)  # Reset file pointer
+
+                                # Parse recipe from image
+                                result = parse_recipe_from_image(image_bytes, ingredients)
+
+                                # Store in session state
+                                st.session_state['ocr_recipe_result'] = result
+                                st.success(f"✅ Extracted {len(result['matched_ingredients'])} ingredients from recipe!")
+                                st.rerun()
+
+                            except Exception as e:
+                                st.error(f"Error processing image: {e}")
+
+                # Display OCR Results if available
+                if 'ocr_recipe_result' in st.session_state:
+                    result = st.session_state['ocr_recipe_result']
+
+                    st.markdown("---")
+                    st.markdown("### 📋 Extracted Ingredients")
+
+                    # Show raw text in expander
+                    with st.expander("📄 View Extracted Text"):
+                        st.text(result['raw_text'])
+
+                    # Show matched ingredients with selection options
+                    st.write(f"**Found {len(result['matched_ingredients'])} ingredients:**")
+
+                    # Create a form for ingredient selection
+                    matched_selections = []
+
+                    for idx, matched in enumerate(result['matched_ingredients']):
+                        parsed = matched['parsed']
+                        matches = matched['matches']
+
+                        st.write(f"**{idx + 1}. {parsed['raw_line']}**")
+
+                        col1, col2, col3 = st.columns([3, 1, 1])
+
+                        with col1:
+                            if len(matches) == 0:
+                                st.warning(f"⚠️ No match found for '{parsed['ingredient_name']}' - You may need to add this ingredient first")
+                                selected_ingredient = None
+                            elif len(matches) == 1:
+                                # Only one match - auto-select
+                                ingredient_obj, score = matches[0]
+                                st.success(f"✓ Matched: {ingredient_obj.name} (confidence: {score*100:.0f}%)")
+                                selected_ingredient = ingredient_obj.id
+                            else:
+                                # Multiple matches - show dropdown
+                                st.info(f"🔍 Multiple matches found - please select:")
+                                match_options = [m[0].id for m in matches]
+                                match_labels = {m[0].id: f"{m[0].name} ({m[1]*100:.0f}% match)" for m in matches}
+
+                                selected_ingredient = st.selectbox(
+                                    "Select ingredient",
+                                    options=[None] + match_options,
+                                    format_func=lambda x: "-- Skip this ingredient --" if x is None else match_labels[x],
+                                    key=f"ocr_match_{idx}"
+                                )
+
+                        with col2:
+                            # Quantity
+                            default_qty = parsed['quantity'] if parsed['quantity'] else 1.0
+                            quantity = st.number_input(
+                                "Quantity",
+                                min_value=0.01,
+                                value=float(default_qty),
+                                step=0.1,
+                                key=f"ocr_qty_{idx}"
+                            )
+
+                        with col3:
+                            # Unit (just for display)
+                            unit_display = parsed['unit'] if parsed['unit'] else 'units'
+                            st.text_input(
+                                "Unit",
+                                value=unit_display,
+                                disabled=True,
+                                key=f"ocr_unit_{idx}"
+                            )
+
+                        if selected_ingredient:
+                            matched_selections.append({
+                                'ingredient_id': selected_ingredient,
+                                'quantity': quantity
+                            })
+
+                        st.write("---")
+
+                    # Store selections in session state
+                    st.session_state['ocr_ingredient_selections'] = matched_selections
+
+                    if st.button("✅ Use These Ingredients", type="primary"):
+                        st.success(f"Selected {len(matched_selections)} ingredients - scroll down to complete the recipe!")
+                        st.info("👇 Fill in the recipe name and price below, then click 'Create Recipe'")
+
+                    if st.button("🗑️ Clear and Start Over"):
+                        del st.session_state['ocr_recipe_result']
+                        if 'ocr_ingredient_selections' in st.session_state:
+                            del st.session_state['ocr_ingredient_selections']
+                        st.rerun()
+
+                st.markdown("---")
+                st.markdown("### ✍️ Option 2: Manual Entry")
+
+                # Get OCR selections if available, otherwise use manual entry
                 with st.form("add_recipe_form"):
                     recipe_name = st.text_input("Recipe Name *", placeholder="e.g., Chocolate Chip Cookie")
                     
@@ -195,13 +324,13 @@ def show_recipes():
                         ingredient_selections.append({'id': ingredient_id, 'quantity': quantity})
                     
                     submitted = st.form_submit_button("➕ Create Recipe")
-                    
+
                     if submitted:
                         if not recipe_name or sale_price <= 0:
                             st.error("Please provide a recipe name and sale price!")
                         else:
                             existing = session.query(Recipe).filter_by(name=recipe_name).first()
-                            
+
                             if existing:
                                 st.error(f"Recipe '{recipe_name}' already exists!")
                             else:
@@ -212,20 +341,36 @@ def show_recipes():
                                     description=description,
                                     square_item_id=square_id if square_id else None
                                 )
-                                
+
                                 session.add(new_recipe)
                                 session.commit()
-                                
-                                for selection in ingredient_selections:
+
+                                # Use OCR selections if available, otherwise manual selections
+                                final_selections = ingredient_selections
+                                if 'ocr_ingredient_selections' in st.session_state and st.session_state['ocr_ingredient_selections']:
+                                    # Convert OCR selections to match format
+                                    final_selections = [
+                                        {'id': s['ingredient_id'], 'quantity': s['quantity']}
+                                        for s in st.session_state['ocr_ingredient_selections']
+                                    ]
+
+                                for selection in final_selections:
                                     recipe_item = RecipeItem(
                                         recipe_id=new_recipe.id,
                                         ingredient_id=selection['id'],
                                         quantity=selection['quantity']
                                     )
                                     session.add(recipe_item)
-                                
+
                                 session.commit()
-                                st.success(f"✅ Created recipe: {recipe_name}")
+
+                                # Clear OCR session state
+                                if 'ocr_recipe_result' in st.session_state:
+                                    del st.session_state['ocr_recipe_result']
+                                if 'ocr_ingredient_selections' in st.session_state:
+                                    del st.session_state['ocr_ingredient_selections']
+
+                                st.success(f"✅ Created recipe: {recipe_name} with {len(final_selections)} ingredients!")
                                 st.rerun()
     
     finally:
