@@ -220,7 +220,33 @@ def show_recipes():
 
                         with col1:
                             if len(matches) == 0:
-                                st.warning(f"⚠️ No match found for '{parsed['ingredient_name']}' - You may need to add this ingredient first")
+                                st.warning(f"⚠️ No match found for '{parsed['ingredient_name']}'")
+
+                                # Allow user to add new ingredient on the fly
+                                with st.expander("➕ Add this ingredient to database"):
+                                    with st.form(key=f"add_new_ingredient_{idx}"):
+                                        new_ing_name = st.text_input("Ingredient Name", value=parsed['ingredient_name'])
+
+                                        col_a, col_b = st.columns(2)
+                                        with col_a:
+                                            new_ing_cost = st.number_input("Cost per Unit (£)", min_value=0.0, step=0.01, value=0.0)
+                                        with col_b:
+                                            new_ing_unit = st.selectbox("Unit", ["g", "kg", "ml", "l", "oz", "lb", "units"])
+
+                                        if st.form_submit_button("Add Ingredient"):
+                                            if new_ing_name and new_ing_cost > 0:
+                                                new_ingredient = Ingredient(
+                                                    name=new_ing_name,
+                                                    cost_per_unit=new_ing_cost,
+                                                    unit=new_ing_unit
+                                                )
+                                                session.add(new_ingredient)
+                                                session.commit()
+                                                st.success(f"✅ Added {new_ing_name} to database!")
+                                                st.info("Please click 'Clear and Start Over' and re-scan to use this ingredient")
+                                            else:
+                                                st.error("Please provide name and cost")
+
                                 selected_ingredient = None
                             elif len(matches) == 1:
                                 # Only one match - auto-select
