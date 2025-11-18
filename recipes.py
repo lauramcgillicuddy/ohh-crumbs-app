@@ -5,6 +5,8 @@ from utils import calculate_recipe_cost, calculate_profit_margin
 from styling import inject_custom_css, render_page_header
 from recipe_ocr_parser import parse_recipe_from_image
 import pandas as pd
+from PIL import Image
+import io
 
 def show_recipes():
     inject_custom_css()
@@ -165,8 +167,13 @@ def show_recipes():
                 if uploaded_file is not None:
                     # Display uploaded image
                     if uploaded_file.type.startswith('image'):
-                        # Use getvalue() to get bytes regardless of file pointer position
-                        st.image(uploaded_file.getvalue(), caption="Uploaded Recipe", use_container_width=True)
+                        try:
+                            # Convert bytes to PIL Image for reliable display
+                            image_bytes = uploaded_file.getvalue()
+                            image = Image.open(io.BytesIO(image_bytes))
+                            st.image(image, caption="Uploaded Recipe", use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Error displaying image: {e}")
 
                     # Process with OCR
                     if st.button("🔍 Extract Ingredients from Image", type="primary"):
