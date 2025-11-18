@@ -4,6 +4,7 @@ from models import Recipe, Ingredient, RecipeItem
 from utils import calculate_recipe_cost, calculate_profit_margin
 from styling import inject_custom_css, render_page_header
 from unit_conversions import BAKING_CONVERSIONS
+from square_api import SquareAPI
 import pandas as pd
 
 def show_recipes():
@@ -167,6 +168,73 @@ def show_recipes():
                 st.warning("⚠️ You need to add ingredients first before creating recipes!")
                 st.info("Go to the 'Ingredient Management' page to add ingredients.")
             else:
+                # Square Items Import Section
+                st.markdown("### 📲 Option 1: Import from Square")
+                st.info("Import items from your Square catalog to create recipes automatically")
+
+                square_api = SquareAPI()
+
+                if square_api.is_configured:
+                    if st.button("🔄 Fetch Square Items", type="primary"):
+                        with st.spinner("Fetching items from Square..."):
+                            st.session_state['square_items'] = square_api.get_catalog_items()
+                            st.success(f"✅ Fetched {len(st.session_state.get('square_items', []))} items from Square!")
+
+                    # Display Square items if fetched
+                    if 'square_items' in st.session_state and st.session_state['square_items']:
+                        square_items = st.session_state['square_items']
+
+                        # Get existing recipes with Square IDs
+                        existing_square_ids = {r.square_item_id for r in session.query(Recipe).all() if r.square_item_id}
+
+                        # Separate into items with/without recipes
+                        items_without_recipes = [item for item in square_items if item['id'] not in existing_square_ids]
+                        items_with_recipes = [item for item in square_items if item['id'] in existing_square_ids]
+
+                        st.write(f"**Square Items:** {len(square_items)} total | {len(items_with_recipes)} with recipes | {len(items_without_recipes)} need recipes")
+
+                        # Show items that need recipes
+                        if items_without_recipes:
+                            with st.expander(f"📋 Items Without Recipes ({len(items_without_recipes)})", expanded=True):
+                                for idx, item in enumerate(items_without_recipes[:10]):  # Show first 10
+                                    col1, col2, col3 = st.columns([3, 1, 1])
+
+                                    with col1:
+                                        st.write(f"**{item['name']}**")
+
+                                    with col2:
+                                        st.write(f"£{item['price']:.2f}")
+
+                                    with col3:
+                                        if st.button("➕ Create Recipe", key=f"create_from_square_{item['id']}"):
+                                            # Create recipe from Square item
+                                            new_recipe = Recipe(
+                                                name=item['name'],
+                                                square_item_id=item['id'],
+                                                sale_price=item['price'],
+                                                category="Imported from Square"
+                                            )
+                                            session.add(new_recipe)
+                                            session.commit()
+                                            st.success(f"✅ Created recipe for '{item['name']}'!")
+                                            st.info("👇 Now scroll down to the 'View Recipes' tab to add ingredients!")
+                                            st.rerun()
+
+                                if len(items_without_recipes) > 10:
+                                    st.info(f"Showing first 10 of {len(items_without_recipes)} items. Scroll to create more.")
+
+                        # Show items that already have recipes
+                        if items_with_recipes:
+                            with st.expander(f"✅ Items With Recipes ({len(items_with_recipes)})"):
+                                for item in items_with_recipes[:10]:
+                                    recipe = session.query(Recipe).filter_by(square_item_id=item['id']).first()
+                                    st.write(f"- **{item['name']}** → Recipe: {recipe.name if recipe else 'Unknown'}")
+
+                else:
+                    st.warning("⚠️ Square API not configured. Go to 'Square Setup' page to configure.")
+
+                st.markdown("---")
+                st.markdown("### ✍️ Option 2: Manual Entry")
                 # Conversion reference
                 with st.expander("📏 Unit Conversion Reference"):
                     st.markdown(BAKING_CONVERSIONS)
