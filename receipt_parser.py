@@ -51,14 +51,24 @@ def parse_receipt_text(text: str) -> Dict:
             if re.search(r'@|phone|tel|sales|accounts', line, re.IGNORECASE):
                 email_phone_indices.append(idx)
 
+        # Prefer vendor/supplier names over customer names
+        # Filter out lines starting with "Deliver", "Invoice To", "To:", etc.
+        supplier_matches = [
+            match for match in company_matches
+            if not re.match(r'^(Deliver|Invoice To|To:)', match[2], re.IGNORECASE)
+        ]
+
+        # Use supplier matches if we found any, otherwise use all matches
+        candidates = supplier_matches if supplier_matches else company_matches
+
         # Pick company name closest to contact info
         if email_phone_indices:
-            best_match = min(company_matches,
+            best_match = min(candidates,
                            key=lambda x: min(abs(x[0] - ei) for ei in email_phone_indices))
             result['vendor_name'] = best_match[1]
         else:
             # No contact info found, just use first match
-            result['vendor_name'] = company_matches[0][1]
+            result['vendor_name'] = candidates[0][1]
 
     # Extract email
     email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
@@ -122,7 +132,9 @@ def parse_receipt_text(text: str) -> Dict:
         (?P<desc>.+?)\s+                 # Description (non-greedy)
         (?P<price>£?\d+.\d{2})\s+        # Unit price (. = any char for OCR tolerance)
         (?P<pack>[0-9.]+[A-Za-z%]+)\s+   # Pack size (e.g., 10kg, 108pcs)
-        (?P<net>£?\d+.\d{2})\s*$         # Net amount (. = any char for OCR tolerance)
+        (?P<net>£?\d+.\d{2})             # Net amount (. = any char for OCR tolerance)
+        (?:\s+[A-Z]\s+\d+)?              # Optional: VAT code and commodity code
+        \s*$                             # End of line
     '''
 
     # Apply to the full text with multiline mode
