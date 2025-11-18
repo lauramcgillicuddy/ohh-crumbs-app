@@ -125,16 +125,17 @@ def parse_receipt_text(text: str) -> Dict:
     matched_lines = []  # Debug: track which lines matched
 
     # Use verbose regex with named groups for clarity
+    # MUCH MORE FLEXIBLE pattern to handle various invoice formats
     line_item_pattern = r'''(?x)  # Enable verbose mode
-        ^(?P<code>[A-Z]\d{3,5})\s+      # Product code: letter + 3-5 digits
-        (?P<qty_ord>\d+)\s+              # Quantity ordered
-        (?P<qty_del>\d+)\s+              # Quantity delivered
-        (?P<desc>.+?)\s+                 # Description (non-greedy)
-        (?P<price>£?\d+.\d{2})\s+        # Unit price (. = any char for OCR tolerance)
-        (?P<pack>\S+)\s+                 # Pack size (any format: 10kg, 108pcs, Packet, Each, etc.)
-        (?P<net>£?\d+.\d{2})             # Net amount (. = any char for OCR tolerance)
-        (?:\s+[A-Z]\s+\d+)?              # Optional: VAT code and commodity code
-        \s*$                             # End of line
+        ^(?P<code>[A-Z]+\d+[A-Z\d]*)\s+     # Product code: flexible (A002, AB002, A81091, etc.)
+        (?P<qty_ord>\d+(?:\.\d+)?)\s+       # Quantity ordered (allows decimals: 1, 2.5, etc.)
+        (?P<qty_del>\d+(?:\.\d+)?)\s+       # Quantity delivered (allows decimals)
+        (?P<desc>.+?)\s+                    # Description (non-greedy, captures until numbers)
+        (?P<price>£?\d+[.,]\d{1,2})\s+      # Unit price (flexible: 5.01, 5,01, 19.8, 46.88)
+        (?P<pack>\S+)\s+                    # Pack size (any format: 10kg, Packet, Each, 90pcs, etc.)
+        (?P<net>£?\d+[.,]\d{1,2})           # Net amount (flexible decimals)
+        (?:\s+[A-Z]\s+\d+)?                 # Optional: VAT code and commodity code
+        \s*$                                # End of line
     '''
 
     # Apply to the full text with multiline mode
@@ -172,9 +173,9 @@ def parse_receipt_text(text: str) -> Dict:
             product_code = matched_dict['code']
             qty = float(matched_dict['qty_ord'])
             item_name = matched_dict['desc'].strip()
-            # Remove £ symbol if present
-            unit_price_str = matched_dict['price'].replace('£', '')
-            net_amount_str = matched_dict['net'].replace('£', '')
+            # Remove £ symbol and handle comma decimals
+            unit_price_str = matched_dict['price'].replace('£', '').replace(',', '.')
+            net_amount_str = matched_dict['net'].replace('£', '').replace(',', '.')
             unit_price = float(unit_price_str)
             net_amount = float(net_amount_str)
             pack_size = matched_dict['pack']
