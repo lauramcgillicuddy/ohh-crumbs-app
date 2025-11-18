@@ -171,7 +171,7 @@ def show_recipes():
                             # Convert bytes to PIL Image for reliable display
                             image_bytes = uploaded_file.getvalue()
                             image = Image.open(io.BytesIO(image_bytes))
-                            st.image(image, caption="Uploaded Recipe", use_container_width=True)
+                            st.image(image, caption="Uploaded Recipe", use_column_width=True)
                         except Exception as e:
                             st.error(f"Error displaying image: {e}")
 
