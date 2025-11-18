@@ -165,17 +165,15 @@ def show_recipes():
                 if uploaded_file is not None:
                     # Display uploaded image
                     if uploaded_file.type.startswith('image'):
-                        # Read file bytes for display
-                        image_bytes = uploaded_file.read()
-                        st.image(image_bytes, caption="Uploaded Recipe", use_container_width=True)
-                        uploaded_file.seek(0)  # Reset file pointer for later processing
+                        # Use getvalue() to get bytes regardless of file pointer position
+                        st.image(uploaded_file.getvalue(), caption="Uploaded Recipe", use_container_width=True)
 
                     # Process with OCR
                     if st.button("🔍 Extract Ingredients from Image", type="primary"):
                         with st.spinner("Reading recipe image..."):
                             try:
-                                image_bytes = uploaded_file.read()
-                                uploaded_file.seek(0)  # Reset file pointer
+                                # Use getvalue() to get full file content
+                                image_bytes = uploaded_file.getvalue()
 
                                 # Parse recipe from image
                                 result = parse_recipe_from_image(image_bytes, ingredients)
