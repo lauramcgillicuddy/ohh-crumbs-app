@@ -17,6 +17,7 @@ def parse_recipe_ingredients(text: str) -> List[Dict[str, any]]:
     - "1 tsp vanilla extract"
     - "500 ml milk"
     - "3 eggs"
+    - "Baking Spread 8oz"
 
     Args:
         text: Recipe text (from OCR or manual input)
@@ -27,69 +28,100 @@ def parse_recipe_ingredients(text: str) -> List[Dict[str, any]]:
     ingredients = []
     lines = text.split('\n')
 
+    # Keywords that indicate this is NOT an ingredient line
+    skip_keywords = [
+        'preheat', 'oven', 'bake', 'cook', 'mix', 'stir', 'beat', 'whisk',
+        'fold', 'combine', 'pour', 'line', 'grease', 'tin', 'pan', 'bowl',
+        'recipe', 'method', 'instructions', 'directions', 'steps', 'serves',
+        'temperature', 'minutes', 'hours', 'degrees', 'fan', 'gas mark',
+        'prep time', 'cook time', 'total time', 'yield', 'servings'
+    ]
+
+    # Track if we're in the ingredients section
+    in_ingredients_section = False
+
     # Common patterns for ingredient lines
-    # Pattern 1: "200g flour" or "200 g flour"
-    pattern1 = r'^[\s•\-*]*(?P<qty>[\d.]+)\s*(?P<unit>g|kg|ml|l|oz|lb|cup|cups|tbsp|tsp|tablespoon|tablespoons|teaspoon|teaspoons)[\s:]*(?P<name>.+)$'
+    # Pattern 1: "Ingredient Name 8oz" or "Ingredient Name 200g"
+    pattern1 = r'^[\s•\-*]*(?P<name>[A-Za-z][A-Za-z\s]+?)\s+(?P<qty>[\d.]+)\s*(?P<unit>g|kg|ml|l|oz|lb|cup|cups|tbsp|tsp|tablespoon|tablespoons|teaspoon|teaspoons)?\s*$'
 
-    # Pattern 2: "2 eggs" or "3 large eggs"
-    pattern2 = r'^[\s•\-*]*(?P<qty>[\d.]+)\s+(?P<name>(?:large|small|medium)?\s*[a-zA-Z\s]+)$'
+    # Pattern 2: "200g flour" or "200 g flour"
+    pattern2 = r'^[\s•\-*]*(?P<qty>[\d.]+)\s*(?P<unit>g|kg|ml|l|oz|lb|cup|cups|tbsp|tsp|tablespoon|tablespoons|teaspoon|teaspoons)[\s:]+(?P<name>.+)$'
 
-    # Pattern 3: "flour - 200g" or "sugar (2 cups)"
-    pattern3 = r'^[\s•\-*]*(?P<name>[a-zA-Z\s]+?)[\s\-\(]+(?P<qty>[\d.]+)\s*(?P<unit>g|kg|ml|l|oz|lb|cup|cups|tbsp|tsp)?'
-
-    # Pattern 4: Just ingredient name with no quantity (user will enter manually)
-    pattern4 = r'^[\s•\-*]*(?P<name>[a-zA-Z][a-zA-Z\s]+)$'
+    # Pattern 3: "2 eggs" or "3 large eggs" or "4 Large Eggs"
+    pattern3 = r'^[\s•\-*]*(?P<qty>[\d.]+)\s+(?P<name>(?:large|small|medium)?\s*[a-zA-Z\s]+)$'
 
     for line in lines:
         line = line.strip()
 
-        # Skip empty lines and common headers
+        # Skip empty lines
         if not line or len(line) < 3:
             continue
-        if re.match(r'^(ingredients?|directions?|instructions?|method|steps?):?$', line, re.IGNORECASE):
+
+        line_lower = line.lower()
+
+        # Check if we're entering ingredients section
+        if re.match(r'^(ingredients?|ingrtedients?):?$', line, re.IGNORECASE):
+            in_ingredients_section = True
             continue
 
-        # Try each pattern in order
+        # Check if we're leaving ingredients section (method/directions start)
+        if re.match(r'^(method|directions?|instructions?|steps?|icing):?$', line, re.IGNORECASE):
+            in_ingredients_section = False
+            continue
+
+        # Skip lines with instruction keywords
+        if any(keyword in line_lower for keyword in skip_keywords):
+            continue
+
+        # Skip lines that are mostly uppercase and don't have numbers (likely titles)
+        if line.isupper() and not re.search(r'\d', line):
+            continue
+
+        # Skip lines that end with temperature indicators
+        if re.search(r'(°|degrees?|fan|gas)\s*\d*\s*$', line_lower):
+            continue
+
+        # Try Pattern 1: "Ingredient Name 8oz" (most common in UK recipes)
         match = re.match(pattern1, line, re.IGNORECASE)
         if match:
-            ingredients.append({
-                'quantity': float(match.group('qty')),
-                'unit': match.group('unit').lower(),
-                'ingredient_name': match.group('name').strip(),
-                'raw_line': line
-            })
-            continue
+            name = match.group('name').strip()
+            # Make sure the name doesn't contain mostly numbers
+            if len(re.findall(r'[a-zA-Z]', name)) >= 3:
+                unit = match.group('unit').lower() if match.group('unit') else 'units'
+                ingredients.append({
+                    'quantity': float(match.group('qty')),
+                    'unit': unit,
+                    'ingredient_name': name,
+                    'raw_line': line
+                })
+                continue
 
+        # Try Pattern 2: "200g flour"
         match = re.match(pattern2, line, re.IGNORECASE)
         if match:
-            ingredients.append({
-                'quantity': float(match.group('qty')),
-                'unit': 'units',
-                'ingredient_name': match.group('name').strip(),
-                'raw_line': line
-            })
-            continue
+            name = match.group('name').strip()
+            if len(re.findall(r'[a-zA-Z]', name)) >= 3:
+                ingredients.append({
+                    'quantity': float(match.group('qty')),
+                    'unit': match.group('unit').lower(),
+                    'ingredient_name': name,
+                    'raw_line': line
+                })
+                continue
 
+        # Try Pattern 3: "4 Large Eggs"
         match = re.match(pattern3, line, re.IGNORECASE)
         if match:
-            unit = match.group('unit') if match.group('unit') else 'units'
-            ingredients.append({
-                'quantity': float(match.group('qty')),
-                'unit': unit.lower(),
-                'ingredient_name': match.group('name').strip(),
-                'raw_line': line
-            })
-            continue
-
-        match = re.match(pattern4, line, re.IGNORECASE)
-        if match and len(match.group('name').strip()) > 2:
-            # Ingredient name only, no quantity
-            ingredients.append({
-                'quantity': None,
-                'unit': None,
-                'ingredient_name': match.group('name').strip(),
-                'raw_line': line
-            })
+            name = match.group('name').strip()
+            # Ensure it's not a number-heavy line and has actual letters
+            if len(re.findall(r'[a-zA-Z]', name)) >= 3 and len(name.split()) <= 5:
+                ingredients.append({
+                    'quantity': float(match.group('qty')),
+                    'unit': 'units',
+                    'ingredient_name': name,
+                    'raw_line': line
+                })
+                continue
 
     return ingredients
 
