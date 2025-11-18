@@ -165,19 +165,23 @@ def show_recipes():
                 )
 
                 if uploaded_file is not None:
-                    # Display uploaded image
+                    # Display uploaded image (reduced size)
                     if uploaded_file.type.startswith('image'):
                         try:
                             # Convert bytes to PIL Image for reliable display
                             image_bytes = uploaded_file.getvalue()
                             image = Image.open(io.BytesIO(image_bytes))
-                            st.image(image, caption="Uploaded Recipe", use_column_width=True)
+
+                            # Display at reduced size (max width 400px)
+                            st.image(image, caption="Uploaded Recipe", width=400)
                         except Exception as e:
                             st.error(f"Error displaying image: {e}")
 
-                    # Process with OCR
-                    if st.button("🔍 Extract Ingredients from Image", type="primary"):
-                        with st.spinner("Reading recipe image..."):
+                    # Auto-extract on upload (if not already extracted)
+                    if 'ocr_recipe_result' not in st.session_state or \
+                       st.session_state.get('last_uploaded_file') != uploaded_file.name:
+
+                        with st.spinner("🔍 Reading recipe image..."):
                             try:
                                 # Use getvalue() to get full file content
                                 image_bytes = uploaded_file.getvalue()
@@ -187,8 +191,9 @@ def show_recipes():
 
                                 # Store in session state
                                 st.session_state['ocr_recipe_result'] = result
+                                st.session_state['last_uploaded_file'] = uploaded_file.name
+
                                 st.success(f"✅ Extracted {len(result['matched_ingredients'])} ingredients from recipe!")
-                                st.rerun()
 
                             except Exception as e:
                                 st.error(f"Error processing image: {e}")
@@ -306,6 +311,8 @@ def show_recipes():
                         del st.session_state['ocr_recipe_result']
                         if 'ocr_ingredient_selections' in st.session_state:
                             del st.session_state['ocr_ingredient_selections']
+                        if 'last_uploaded_file' in st.session_state:
+                            del st.session_state['last_uploaded_file']
                         st.rerun()
 
                 st.markdown("---")
@@ -403,6 +410,8 @@ def show_recipes():
                                     del st.session_state['ocr_recipe_result']
                                 if 'ocr_ingredient_selections' in st.session_state:
                                     del st.session_state['ocr_ingredient_selections']
+                                if 'last_uploaded_file' in st.session_state:
+                                    del st.session_state['last_uploaded_file']
 
                                 st.success(f"✅ Created recipe: {recipe_name} with {len(final_selections)} ingredients!")
                                 st.rerun()
