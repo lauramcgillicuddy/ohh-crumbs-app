@@ -29,20 +29,60 @@ def get_engine():
 def init_db():
     engine = get_engine()
     Base.metadata.create_all(engine)
-    
+
     from sqlalchemy import text, inspect
-    
+
     inspector = inspect(engine)
-    
+
     with engine.connect() as conn:
         existing_tables = inspector.get_table_names()
-        
+
         if 'ingredients' in existing_tables:
             columns = [col['name'] for col in inspector.get_columns('ingredients')]
-            
+
             if 'supplier_id' not in columns:
                 try:
                     conn.execute(text("ALTER TABLE ingredients ADD COLUMN supplier_id INTEGER REFERENCES suppliers(id)"))
+                    conn.commit()
+                except Exception:
+                    pass
+
+            # Natasha's Law migrations for ingredients table
+            if 'allergens' not in columns:
+                try:
+                    conn.execute(text("ALTER TABLE ingredients ADD COLUMN allergens TEXT"))
+                    conn.commit()
+                except Exception:
+                    pass
+
+            if 'sub_ingredients' not in columns:
+                try:
+                    conn.execute(text("ALTER TABLE ingredients ADD COLUMN sub_ingredients TEXT"))
+                    conn.commit()
+                except Exception:
+                    pass
+
+            if 'may_contain' not in columns:
+                try:
+                    conn.execute(text("ALTER TABLE ingredients ADD COLUMN may_contain TEXT"))
+                    conn.commit()
+                except Exception:
+                    pass
+
+        # Natasha's Law migrations for recipes table
+        if 'recipes' in existing_tables:
+            columns = [col['name'] for col in inspector.get_columns('recipes')]
+
+            if 'storage_instructions' not in columns:
+                try:
+                    conn.execute(text("ALTER TABLE recipes ADD COLUMN storage_instructions TEXT"))
+                    conn.commit()
+                except Exception:
+                    pass
+
+            if 'use_by_days' not in columns:
+                try:
+                    conn.execute(text("ALTER TABLE recipes ADD COLUMN use_by_days INTEGER"))
                     conn.commit()
                 except Exception:
                     pass
