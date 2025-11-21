@@ -417,7 +417,7 @@ def preprocess_image_for_ocr(image: 'Image.Image') -> 'Image.Image':
     - Sharpen
     - Convert to grayscale
     """
-    from PIL import ImageEnhance, ImageFilter
+    from PIL import Image, ImageEnhance, ImageFilter
 
     # Resize image if too large (optimal OCR is around 300 DPI)
     max_dimension = 2000
