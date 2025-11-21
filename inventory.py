@@ -1,10 +1,11 @@
 import streamlit as st
 from database import get_session, close_session
-from models import Recipe, Ingredient, RecipeItem, DailyUsage
+from models import Recipe, Ingredient, RecipeItem, DailyUsage, SalesCache
 from square_api import SquareAPI
 from styling import inject_custom_css, render_page_header
 from datetime import datetime, timedelta
 import pandas as pd
+from sqlalchemy import func
 
 
 def process_square_orders_and_update_inventory(days_back=1):
@@ -222,68 +223,76 @@ def show_inventory():
 
         st.markdown("---")
 
-        # Link Square Items to Recipes
-        st.subheader("🔗 Link Square Items to Recipes")
+        # Link Square Sales Items to Recipes
+        st.subheader("🔗 Link Square Sales Items to Recipes")
 
-        st.info("Match your Square menu items to recipes so ingredient usage can be tracked automatically")
+        st.info("Match your Square sales items to recipes so ingredient usage can be tracked automatically")
 
-        # Get Square catalog items
-        square_api = SquareAPI()
+        # Get items from sales history
+        sales_items_query = session.query(
+            SalesCache.item_name,
+            func.sum(SalesCache.quantity).label('total_sold')
+        ).group_by(SalesCache.item_name).all()
 
-        if square_api.is_configured:
-            square_items = square_api.get_catalog_items()
-            recipes = session.query(Recipe).order_by(Recipe.name).all()
+        sales_items = []
+        for item_name, total_sold in sales_items_query:
+            if item_name and item_name.strip():
+                sales_items.append({
+                    'name': item_name,
+                    'total_sold': int(total_sold) if total_sold else 0
+                })
 
-            if square_items and recipes:
-                st.write(f"**Found {len(square_items)} items in Square catalog**")
+        recipes = session.query(Recipe).order_by(Recipe.name).all()
 
-                # Show current linkages
-                linked_recipes = [r for r in recipes if r.square_item_id]
+        if sales_items and recipes:
+            st.write(f"**Found {len(sales_items)} items in sales history**")
 
-                if linked_recipes:
-                    st.write("**Currently Linked:**")
-                    for recipe in linked_recipes:
-                        # Find the Square item name
-                        square_item = next((item for item in square_items if item['id'] == recipe.square_item_id), None)
-                        square_name = square_item['name'] if square_item else "Unknown"
-                        st.write(f"- Recipe: **{recipe.name}** → Square Item: **{square_name}**")
+            # Show current linkages (by matching names)
+            linked_items = []
+            for recipe in recipes:
+                # Find sales item with matching name
+                matching_item = next((item for item in sales_items if item['name'].lower() == recipe.name.lower()), None)
+                if matching_item:
+                    linked_items.append({
+                        'recipe': recipe.name,
+                        'sales_item': matching_item['name'],
+                        'total_sold': matching_item['total_sold']
+                    })
 
+            if linked_items:
+                with st.expander(f"✅ Currently Linked ({len(linked_items)})", expanded=False):
+                    for link in linked_items:
+                        st.write(f"- **{link['recipe']}** → {link['sales_item']} ({link['total_sold']} sold)")
+
+            # Show unlinked items
+            linked_names = {link['recipe'].lower() for link in linked_items}
+            unlinked_sales = [item for item in sales_items if item['name'].lower() not in linked_names]
+
+            if unlinked_sales:
                 st.write("---")
-                st.write("**Add New Linkage:**")
+                st.write(f"**⚠️ {len(unlinked_sales)} Sales Items Not Linked to Recipes:**")
+                st.info("These items are selling but don't have recipes in your system. Create recipes for them to track ingredient usage!")
 
-                # Form to link items
-                with st.form("link_square_item"):
-                    col1, col2 = st.columns(2)
+                # Sort by total sold
+                sorted_unlinked = sorted(unlinked_sales, key=lambda x: x['total_sold'], reverse=True)
 
-                    with col1:
-                        selected_recipe = st.selectbox(
-                            "Select Recipe",
-                            options=[r.id for r in recipes],
-                            format_func=lambda x: next(r.name for r in recipes if r.id == x)
-                        )
+                with st.expander("📋 View Unlinked Sales Items", expanded=True):
+                    for item in sorted_unlinked[:15]:
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            st.write(f"**{item['name']}**")
+                        with col2:
+                            st.write(f"{item['total_sold']} sold")
 
-                    with col2:
-                        selected_square_item = st.selectbox(
-                            "Select Square Item",
-                            options=[item['id'] for item in square_items],
-                            format_func=lambda x: next(item['name'] for item in square_items if item['id'] == x)
-                        )
+                    if len(sorted_unlinked) > 15:
+                        st.caption(f"Showing top 15 of {len(sorted_unlinked)} items")
 
-                    if st.form_submit_button("🔗 Link Items"):
-                        recipe = session.query(Recipe).get(selected_recipe)
-                        recipe.square_item_id = selected_square_item
-                        session.commit()
-
-                        square_item_name = next(item['name'] for item in square_items if item['id'] == selected_square_item)
-                        st.success(f"✅ Linked {recipe.name} to {square_item_name}")
-                        st.rerun()
-            else:
-                if not square_items:
-                    st.warning("No items found in Square catalog")
-                if not recipes:
-                    st.warning("No recipes in database. Create recipes first!")
+                st.write("💡 **Tip:** Go to the Recipes page → Add Recipe tab to create recipes for these items!")
         else:
-            st.error("Square API not configured. Add SQUARE_ACCESS_TOKEN to your secrets.")
+            if not sales_items:
+                st.warning("No sales data found. Sales history will appear here once you have Square transactions.")
+            if not recipes:
+                st.warning("No recipes in database. Create recipes first!")
 
         st.markdown("---")
 
