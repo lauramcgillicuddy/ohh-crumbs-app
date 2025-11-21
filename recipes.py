@@ -341,12 +341,14 @@ def show_recipes():
 
                         sales_items = []
                         for item_name, avg_price, total_sold in sales_items_query:
-                            sales_items.append({
-                                'name': item_name,
-                                'price': float(avg_price) if avg_price else 0.0,
-                                'total_sold': int(total_sold) if total_sold else 0,
-                                'source': 'sales_history'
-                            })
+                            # Skip items with no name
+                            if item_name and item_name.strip():
+                                sales_items.append({
+                                    'name': item_name,
+                                    'price': float(avg_price) if avg_price else 0.0,
+                                    'total_sold': int(total_sold) if total_sold else 0,
+                                    'source': 'sales_history'
+                                })
 
                         st.session_state['sales_history_items'] = sales_items
                         st.success(f"✅ Found {len(sales_items)} items from your sales history!")
@@ -356,7 +358,7 @@ def show_recipes():
                     sales_items = st.session_state['sales_history_items']
 
                     # Get existing recipe names
-                    existing_recipe_names = {r.name.lower() for r in session.query(Recipe).all()}
+                    existing_recipe_names = {r.name.lower() for r in session.query(Recipe).all() if r.name}
 
                     # Separate into items with/without recipes
                     items_without_recipes_sales = [item for item in sales_items if item['name'].lower() not in existing_recipe_names]
