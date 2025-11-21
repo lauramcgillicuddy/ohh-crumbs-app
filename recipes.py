@@ -251,12 +251,12 @@ def show_recipes():
 
                     st.write(f"**Sales Items:** {len(sales_items)} total | {len(items_with_recipes_sales)} with recipes | {len(items_without_recipes_sales)} need recipes")
 
-                    # Show items that need recipes
-                    if items_without_recipes_sales:
-                        # Check if we're currently creating a recipe from a sales item
-                        if 'creating_sales_recipe' in st.session_state:
-                            # Show ingredient selection form for the selected sales item
-                            selected_item = st.session_state['creating_sales_recipe']
+                    # Check if we're currently creating a recipe from a sales item
+                    if 'creating_sales_recipe' in st.session_state:
+                        # Show ingredient selection form for the selected sales item
+                        selected_item = st.session_state['creating_sales_recipe']
+
+                        if selected_item:
 
                             st.markdown(f"### 🎂 Creating Recipe: {selected_item['name']}")
                             st.write(f"**Average Sale Price:** £{selected_item['price']:.2f}")
@@ -361,38 +361,55 @@ def show_recipes():
                                     del st.session_state['creating_sales_recipe']
                                     st.rerun()
 
-                        else:
-                            # Show list of sales items without recipes
-                            with st.expander(f"📋 Items Without Recipes ({len(items_without_recipes_sales)})", expanded=True):
-                                # Sort by total sold descending
-                                sorted_items = sorted(items_without_recipes_sales, key=lambda x: x['total_sold'], reverse=True)
+                    else:
+                        # Show ALL sales items in a scrollable container
+                        st.markdown("### 📋 All Sales Items")
+                        st.info("Scroll through all your sales items. Items already in the database are marked with ✅")
 
-                                for item in sorted_items[:10]:  # Show first 10
-                                    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                        # Sort all items by total sold descending
+                        sorted_all_items = sorted(sales_items, key=lambda x: x['total_sold'], reverse=True)
 
-                                    with col1:
+                        # Create scrollable container with max height
+                        with st.container():
+                            # Add custom CSS for scrollable area
+                            st.markdown("""
+                                <style>
+                                .scrollable-items {
+                                    max-height: 600px;
+                                    overflow-y: auto;
+                                    padding: 10px;
+                                }
+                                </style>
+                            """, unsafe_allow_html=True)
+
+                            for item in sorted_all_items:
+                                # Check if recipe exists
+                                has_recipe = item['name'].lower() in existing_recipe_names
+
+                                col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+
+                                with col1:
+                                    if has_recipe:
+                                        st.write(f"✅ **{item['name']}** *(Already in database)*")
+                                    else:
                                         st.write(f"**{item['name']}**")
 
-                                    with col2:
-                                        st.write(f"£{item['price']:.2f}")
+                                with col2:
+                                    st.write(f"£{item['price']:.2f}")
 
-                                    with col3:
-                                        st.write(f"{item['total_sold']} sold")
+                                with col3:
+                                    st.write(f"{item['total_sold']} sold")
 
-                                    with col4:
-                                        if st.button("➕ Create Recipe", key=f"create_from_sales_{item['name'].replace(' ', '_')}"):
+                                with col4:
+                                    if has_recipe:
+                                        st.write("✅ Done")
+                                    else:
+                                        if st.button("➕ Create", key=f"create_from_sales_{item['name'].replace(' ', '_').replace('/', '_')}"):
                                             # Store the selected item in session state
                                             st.session_state['creating_sales_recipe'] = item
                                             st.rerun()
 
-                                if len(items_without_recipes_sales) > 10:
-                                    st.info(f"Showing top 10 by sales. {len(items_without_recipes_sales)} items total.")
-
-                    # Show items that already have recipes
-                    if items_with_recipes_sales:
-                        with st.expander(f"✅ Items With Recipes ({len(items_with_recipes_sales)})"):
-                            for item in items_with_recipes_sales[:10]:
-                                st.write(f"- **{item['name']}** (Sold: {item['total_sold']} units)")
+                                st.markdown("---")
 
                 st.markdown("---")
                 st.markdown("### ✍️ Manual Recipe Entry")
