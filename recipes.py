@@ -169,168 +169,11 @@ def show_recipes():
                 st.warning("⚠️ You need to add ingredients first before creating recipes!")
                 st.info("Go to the 'Ingredient Management' page to add ingredients.")
             else:
-                # Square Items Import Section
-                st.markdown("### 📲 Option 1: Import from Square")
-                st.info("Import items from your Square catalog to create recipes automatically")
+                # Sales History Import Section
+                st.markdown("### 📊 Import from Square Sales History")
+                st.info("Create recipes from your existing Square sales data with ingredients from your saved list!")
 
-                square_api = SquareAPI()
-
-                if square_api.is_configured:
-                    if st.button("🔄 Fetch Square Items", type="primary"):
-                        with st.spinner("Fetching items from Square..."):
-                            st.session_state['square_items'] = square_api.get_catalog_items()
-                            st.success(f"✅ Fetched {len(st.session_state.get('square_items', []))} items from Square!")
-
-                    # Display Square items if fetched
-                    if 'square_items' in st.session_state and st.session_state['square_items']:
-                        square_items = st.session_state['square_items']
-
-                        # Get existing recipes with Square IDs
-                        existing_square_ids = {r.square_item_id for r in session.query(Recipe).all() if r.square_item_id}
-
-                        # Separate into items with/without recipes
-                        items_without_recipes = [item for item in square_items if item['id'] not in existing_square_ids]
-                        items_with_recipes = [item for item in square_items if item['id'] in existing_square_ids]
-
-                        st.write(f"**Square Items:** {len(square_items)} total | {len(items_with_recipes)} with recipes | {len(items_without_recipes)} need recipes")
-
-                        # Show items that need recipes
-                        if items_without_recipes:
-                            # Check if we're currently creating a recipe from a Square item
-                            if 'creating_square_recipe' in st.session_state:
-                                # Show ingredient selection form for the selected Square item
-                                selected_item = st.session_state['creating_square_recipe']
-
-                                st.markdown(f"### 🎂 Creating Recipe: {selected_item['name']}")
-                                st.write(f"**Sale Price:** £{selected_item['price']:.2f}")
-                                st.write(f"**Square ID:** {selected_item['id']}")
-                                st.markdown("---")
-
-                                with st.form(key="create_square_recipe_with_ingredients"):
-                                    st.write("**Add Ingredients to This Recipe**")
-                                    st.info("Select the ingredients and quantities for this recipe. You can always add more later!")
-
-                                    # Optional category and description
-                                    category = st.text_input("Category (optional)", value="Imported from Square", placeholder="e.g., Cakes, Cookies, Drinks")
-                                    description = st.text_area("Description (optional)", placeholder="Any notes or special instructions")
-
-                                    num_ingredients = st.number_input("How many ingredients to add now?", min_value=0, max_value=20, value=3, step=1)
-
-                                    ingredient_selections = []
-
-                                    for i in range(int(num_ingredients)):
-                                        st.write(f"**Ingredient #{i+1}**")
-                                        col_ing, col_qty, col_unit = st.columns([2, 1, 1])
-
-                                        with col_ing:
-                                            ingredient_id = st.selectbox(
-                                                "Ingredient",
-                                                options=[ing.id for ing in ingredients],
-                                                format_func=lambda x: next(ing.name for ing in ingredients if ing.id == x),
-                                                key=f"square_recipe_ing_{i}"
-                                            )
-
-                                        selected_ing = next(ing for ing in ingredients if ing.id == ingredient_id)
-
-                                        with col_qty:
-                                            quantity = st.number_input(
-                                                "Quantity",
-                                                min_value=0.01,
-                                                step=0.1,
-                                                value=1.0,
-                                                key=f"square_recipe_qty_{i}"
-                                            )
-
-                                        with col_unit:
-                                            st.text_input(
-                                                "Unit",
-                                                value=selected_ing.unit,
-                                                disabled=True,
-                                                key=f"square_recipe_unit_{i}",
-                                                help=f"This ingredient is measured in {selected_ing.unit}"
-                                            )
-
-                                        ingredient_selections.append({'id': ingredient_id, 'quantity': quantity})
-
-                                    col_create, col_cancel = st.columns(2)
-
-                                    with col_create:
-                                        create_submitted = st.form_submit_button("✅ Create Recipe with Ingredients", type="primary")
-
-                                    with col_cancel:
-                                        cancel_submitted = st.form_submit_button("❌ Cancel")
-
-                                    if create_submitted:
-                                        # Create the recipe
-                                        new_recipe = Recipe(
-                                            name=selected_item['name'],
-                                            square_item_id=selected_item['id'],
-                                            sale_price=selected_item['price'],
-                                            category=category,
-                                            description=description
-                                        )
-                                        session.add(new_recipe)
-                                        session.commit()
-
-                                        # Add ingredients
-                                        for selection in ingredient_selections:
-                                            recipe_item = RecipeItem(
-                                                recipe_id=new_recipe.id,
-                                                ingredient_id=selection['id'],
-                                                quantity=selection['quantity']
-                                            )
-                                            session.add(recipe_item)
-
-                                        session.commit()
-
-                                        # Clear the session state
-                                        del st.session_state['creating_square_recipe']
-
-                                        st.success(f"✅ Created recipe for '{selected_item['name']}' with {len(ingredient_selections)} ingredients!")
-                                        st.rerun()
-
-                                    if cancel_submitted:
-                                        del st.session_state['creating_square_recipe']
-                                        st.rerun()
-
-                            else:
-                                # Show list of Square items without recipes
-                                with st.expander(f"📋 Items Without Recipes ({len(items_without_recipes)})", expanded=True):
-                                    for idx, item in enumerate(items_without_recipes[:10]):  # Show first 10
-                                        col1, col2, col3 = st.columns([3, 1, 1])
-
-                                        with col1:
-                                            st.write(f"**{item['name']}**")
-
-                                        with col2:
-                                            st.write(f"£{item['price']:.2f}")
-
-                                        with col3:
-                                            if st.button("➕ Create Recipe", key=f"create_from_square_{item['id']}"):
-                                                # Store the selected item in session state
-                                                st.session_state['creating_square_recipe'] = item
-                                                st.rerun()
-
-                                    if len(items_without_recipes) > 10:
-                                        st.info(f"Showing first 10 of {len(items_without_recipes)} items. Scroll to create more.")
-
-                        # Show items that already have recipes
-                        if items_with_recipes:
-                            with st.expander(f"✅ Items With Recipes ({len(items_with_recipes)})"):
-                                for item in items_with_recipes[:10]:
-                                    recipe = session.query(Recipe).filter_by(square_item_id=item['id']).first()
-                                    st.write(f"- **{item['name']}** → Recipe: {recipe.name if recipe else 'Unknown'}")
-
-                else:
-                    st.warning("⚠️ Square API not configured. Go to 'Square Setup' page to configure.")
-
-                st.markdown("---")
-
-                # Sales History Import Section (Alternative to Square Catalog)
-                st.markdown("### 📊 Option 1B: Import from Sales History")
-                st.info("Can't access Square catalog? Create recipes from your existing sales data instead!")
-
-                if st.button("📈 Load Items from Sales History", type="secondary"):
+                if st.button("📈 Load Items from Sales History", type="primary"):
                     with st.spinner("Loading items from sales history..."):
                         # Get unique items from sales cache with average prices
                         sales_items_query = session.query(
@@ -436,33 +279,41 @@ def show_recipes():
                                     cancel_submitted = st.form_submit_button("❌ Cancel")
 
                                 if create_submitted:
-                                    # Create the recipe
-                                    new_recipe = Recipe(
-                                        name=selected_item['name'],
-                                        square_item_id=None,  # No Square ID for sales history items
-                                        sale_price=sale_price,
-                                        category=category,
-                                        description=description
-                                    )
-                                    session.add(new_recipe)
-                                    session.commit()
+                                    # Check if recipe already exists
+                                    existing_recipe = session.query(Recipe).filter(
+                                        func.lower(Recipe.name) == selected_item['name'].lower()
+                                    ).first()
 
-                                    # Add ingredients
-                                    for selection in ingredient_selections:
-                                        recipe_item = RecipeItem(
-                                            recipe_id=new_recipe.id,
-                                            ingredient_id=selection['id'],
-                                            quantity=selection['quantity']
+                                    if existing_recipe:
+                                        st.error(f"❌ Recipe '{selected_item['name']}' already exists! Please check the 'View Recipes' tab.")
+                                    else:
+                                        # Create the recipe
+                                        new_recipe = Recipe(
+                                            name=selected_item['name'],
+                                            square_item_id=None,  # No Square ID for sales history items
+                                            sale_price=sale_price,
+                                            category=category,
+                                            description=description
                                         )
-                                        session.add(recipe_item)
+                                        session.add(new_recipe)
+                                        session.commit()
 
-                                    session.commit()
+                                        # Add ingredients
+                                        for selection in ingredient_selections:
+                                            recipe_item = RecipeItem(
+                                                recipe_id=new_recipe.id,
+                                                ingredient_id=selection['id'],
+                                                quantity=selection['quantity']
+                                            )
+                                            session.add(recipe_item)
 
-                                    # Clear the session state
-                                    del st.session_state['creating_sales_recipe']
+                                        session.commit()
 
-                                    st.success(f"✅ Created recipe for '{selected_item['name']}' with {len(ingredient_selections)} ingredients!")
-                                    st.rerun()
+                                        # Clear the session state
+                                        del st.session_state['creating_sales_recipe']
+
+                                        st.success(f"✅ Created recipe for '{selected_item['name']}' with {len(ingredient_selections)} ingredients!")
+                                        st.rerun()
 
                                 if cancel_submitted:
                                     del st.session_state['creating_sales_recipe']
@@ -502,7 +353,9 @@ def show_recipes():
                                 st.write(f"- **{item['name']}** (Sold: {item['total_sold']} units)")
 
                 st.markdown("---")
-                st.markdown("### ✍️ Option 2: Manual Entry")
+                st.markdown("### ✍️ Manual Recipe Entry")
+                st.info("Create a recipe from scratch if it's not in your sales history")
+
                 # Conversion reference
                 with st.expander("📏 Unit Conversion Reference"):
                     st.markdown(BAKING_CONVERSIONS)
@@ -510,33 +363,32 @@ def show_recipes():
 
                 with st.form("add_recipe_form"):
                     recipe_name = st.text_input("Recipe Name *", placeholder="e.g., Chocolate Chip Cookie")
-                    
+
                     col1, col2 = st.columns(2)
-                    
+
                     with col1:
                         sale_price = st.number_input("Sale Price (£) *", min_value=0.0, step=0.01, value=0.0)
-                    
+
                     with col2:
                         category = st.text_input("Category", placeholder="e.g., Cookies")
-                    
+
                     description = st.text_area("Description (optional)", placeholder="Any notes or special instructions")
-                    square_id = st.text_input("Square Item ID (optional)", placeholder="Leave blank if not syncing with Square")
-                    
+
                     st.write("---")
                     st.write("**Add Ingredients to Recipe**")
                     st.info("You can add more ingredients after creating the recipe by editing it.")
-                    
+
                     num_ingredients = st.number_input("How many ingredients to add now?", min_value=0, max_value=20, value=3, step=1)
-                    
+
                     ingredient_selections = []
-                    
+
                     for i in range(int(num_ingredients)):
                         st.write(f"**Ingredient #{i+1}**")
                         col_ing, col_qty, col_unit = st.columns([2, 1, 1])
 
                         with col_ing:
                             ingredient_id = st.selectbox(
-                                f"Ingredient",
+                                "Ingredient",
                                 options=[ing.id for ing in ingredients],
                                 format_func=lambda x: next(ing.name for ing in ingredients if ing.id == x),
                                 key=f"new_recipe_ing_{i}"
@@ -547,7 +399,7 @@ def show_recipes():
 
                         with col_qty:
                             quantity = st.number_input(
-                                f"Quantity",
+                                "Quantity",
                                 min_value=0.01,
                                 step=0.1,
                                 value=1.0,
@@ -564,14 +416,17 @@ def show_recipes():
                             )
 
                         ingredient_selections.append({'id': ingredient_id, 'quantity': quantity})
-                    
+
                     submitted = st.form_submit_button("➕ Create Recipe")
 
                     if submitted:
                         if not recipe_name or sale_price <= 0:
                             st.error("Please provide a recipe name and sale price!")
                         else:
-                            existing = session.query(Recipe).filter_by(name=recipe_name).first()
+                            # Check if recipe already exists
+                            existing = session.query(Recipe).filter(
+                                func.lower(Recipe.name) == recipe_name.lower()
+                            ).first()
 
                             if existing:
                                 st.error(f"Recipe '{recipe_name}' already exists!")
@@ -581,7 +436,7 @@ def show_recipes():
                                     sale_price=sale_price,
                                     category=category,
                                     description=description,
-                                    square_item_id=square_id if square_id else None
+                                    square_item_id=None
                                 )
 
                                 session.add(new_recipe)
@@ -599,6 +454,6 @@ def show_recipes():
 
                                 st.success(f"✅ Created recipe: {recipe_name} with {len(ingredient_selections)} ingredients!")
                                 st.rerun()
-    
+
     finally:
         close_session(session)
