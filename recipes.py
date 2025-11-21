@@ -1,11 +1,12 @@
 import streamlit as st
 from database import get_session, close_session
-from models import Recipe, Ingredient, RecipeItem
+from models import Recipe, Ingredient, RecipeItem, SalesCache
 from utils import calculate_recipe_cost, calculate_profit_margin
 from styling import inject_custom_css, render_page_header
 from unit_conversions import BAKING_CONVERSIONS
 from square_api import SquareAPI
 import pandas as pd
+from sqlalchemy import func
 
 def show_recipes():
     inject_custom_css()
@@ -322,6 +323,181 @@ def show_recipes():
 
                 else:
                     st.warning("⚠️ Square API not configured. Go to 'Square Setup' page to configure.")
+
+                st.markdown("---")
+
+                # Sales History Import Section (Alternative to Square Catalog)
+                st.markdown("### 📊 Option 1B: Import from Sales History")
+                st.info("Can't access Square catalog? Create recipes from your existing sales data instead!")
+
+                if st.button("📈 Load Items from Sales History", type="secondary"):
+                    with st.spinner("Loading items from sales history..."):
+                        # Get unique items from sales cache with average prices
+                        sales_items_query = session.query(
+                            SalesCache.item_name,
+                            func.avg(SalesCache.total_amount / SalesCache.quantity).label('avg_price'),
+                            func.sum(SalesCache.quantity).label('total_sold')
+                        ).group_by(SalesCache.item_name).all()
+
+                        sales_items = []
+                        for item_name, avg_price, total_sold in sales_items_query:
+                            sales_items.append({
+                                'name': item_name,
+                                'price': float(avg_price) if avg_price else 0.0,
+                                'total_sold': int(total_sold) if total_sold else 0,
+                                'source': 'sales_history'
+                            })
+
+                        st.session_state['sales_history_items'] = sales_items
+                        st.success(f"✅ Found {len(sales_items)} items from your sales history!")
+
+                # Display sales history items if loaded
+                if 'sales_history_items' in st.session_state and st.session_state['sales_history_items']:
+                    sales_items = st.session_state['sales_history_items']
+
+                    # Get existing recipe names
+                    existing_recipe_names = {r.name.lower() for r in session.query(Recipe).all()}
+
+                    # Separate into items with/without recipes
+                    items_without_recipes_sales = [item for item in sales_items if item['name'].lower() not in existing_recipe_names]
+                    items_with_recipes_sales = [item for item in sales_items if item['name'].lower() in existing_recipe_names]
+
+                    st.write(f"**Sales Items:** {len(sales_items)} total | {len(items_with_recipes_sales)} with recipes | {len(items_without_recipes_sales)} need recipes")
+
+                    # Show items that need recipes
+                    if items_without_recipes_sales:
+                        # Check if we're currently creating a recipe from a sales item
+                        if 'creating_sales_recipe' in st.session_state:
+                            # Show ingredient selection form for the selected sales item
+                            selected_item = st.session_state['creating_sales_recipe']
+
+                            st.markdown(f"### 🎂 Creating Recipe: {selected_item['name']}")
+                            st.write(f"**Average Sale Price:** £{selected_item['price']:.2f}")
+                            st.write(f"**Total Units Sold:** {selected_item['total_sold']}")
+                            st.markdown("---")
+
+                            with st.form(key="create_sales_recipe_with_ingredients"):
+                                st.write("**Add Ingredients to This Recipe**")
+                                st.info("Select the ingredients and quantities for this recipe. You can always add more later!")
+
+                                # Optional category and description
+                                category = st.text_input("Category (optional)", value="From Sales History", placeholder="e.g., Cakes, Cookies, Drinks")
+                                description = st.text_area("Description (optional)", placeholder="Any notes or special instructions")
+
+                                # Editable sale price (pre-filled with average)
+                                sale_price = st.number_input("Sale Price (£)", value=float(selected_item['price']), min_value=0.01, step=0.01)
+
+                                num_ingredients = st.number_input("How many ingredients to add now?", min_value=0, max_value=20, value=3, step=1)
+
+                                ingredient_selections = []
+
+                                for i in range(int(num_ingredients)):
+                                    st.write(f"**Ingredient #{i+1}**")
+                                    col_ing, col_qty, col_unit = st.columns([2, 1, 1])
+
+                                    with col_ing:
+                                        ingredient_id = st.selectbox(
+                                            "Ingredient",
+                                            options=[ing.id for ing in ingredients],
+                                            format_func=lambda x: next(ing.name for ing in ingredients if ing.id == x),
+                                            key=f"sales_recipe_ing_{i}"
+                                        )
+
+                                    selected_ing = next(ing for ing in ingredients if ing.id == ingredient_id)
+
+                                    with col_qty:
+                                        quantity = st.number_input(
+                                            "Quantity",
+                                            min_value=0.01,
+                                            step=0.1,
+                                            value=1.0,
+                                            key=f"sales_recipe_qty_{i}"
+                                        )
+
+                                    with col_unit:
+                                        st.text_input(
+                                            "Unit",
+                                            value=selected_ing.unit,
+                                            disabled=True,
+                                            key=f"sales_recipe_unit_{i}",
+                                            help=f"This ingredient is measured in {selected_ing.unit}"
+                                        )
+
+                                    ingredient_selections.append({'id': ingredient_id, 'quantity': quantity})
+
+                                col_create, col_cancel = st.columns(2)
+
+                                with col_create:
+                                    create_submitted = st.form_submit_button("✅ Create Recipe with Ingredients", type="primary")
+
+                                with col_cancel:
+                                    cancel_submitted = st.form_submit_button("❌ Cancel")
+
+                                if create_submitted:
+                                    # Create the recipe
+                                    new_recipe = Recipe(
+                                        name=selected_item['name'],
+                                        square_item_id=None,  # No Square ID for sales history items
+                                        sale_price=sale_price,
+                                        category=category,
+                                        description=description
+                                    )
+                                    session.add(new_recipe)
+                                    session.commit()
+
+                                    # Add ingredients
+                                    for selection in ingredient_selections:
+                                        recipe_item = RecipeItem(
+                                            recipe_id=new_recipe.id,
+                                            ingredient_id=selection['id'],
+                                            quantity=selection['quantity']
+                                        )
+                                        session.add(recipe_item)
+
+                                    session.commit()
+
+                                    # Clear the session state
+                                    del st.session_state['creating_sales_recipe']
+
+                                    st.success(f"✅ Created recipe for '{selected_item['name']}' with {len(ingredient_selections)} ingredients!")
+                                    st.rerun()
+
+                                if cancel_submitted:
+                                    del st.session_state['creating_sales_recipe']
+                                    st.rerun()
+
+                        else:
+                            # Show list of sales items without recipes
+                            with st.expander(f"📋 Items Without Recipes ({len(items_without_recipes_sales)})", expanded=True):
+                                # Sort by total sold descending
+                                sorted_items = sorted(items_without_recipes_sales, key=lambda x: x['total_sold'], reverse=True)
+
+                                for item in sorted_items[:10]:  # Show first 10
+                                    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+
+                                    with col1:
+                                        st.write(f"**{item['name']}**")
+
+                                    with col2:
+                                        st.write(f"£{item['price']:.2f}")
+
+                                    with col3:
+                                        st.write(f"{item['total_sold']} sold")
+
+                                    with col4:
+                                        if st.button("➕ Create Recipe", key=f"create_from_sales_{item['name'].replace(' ', '_')}"):
+                                            # Store the selected item in session state
+                                            st.session_state['creating_sales_recipe'] = item
+                                            st.rerun()
+
+                                if len(items_without_recipes_sales) > 10:
+                                    st.info(f"Showing top 10 by sales. {len(items_without_recipes_sales)} items total.")
+
+                    # Show items that already have recipes
+                    if items_with_recipes_sales:
+                        with st.expander(f"✅ Items With Recipes ({len(items_with_recipes_sales)})"):
+                            for item in items_with_recipes_sales[:10]:
+                                st.write(f"- **{item['name']}** (Sold: {item['total_sold']} units)")
 
                 st.markdown("---")
                 st.markdown("### ✍️ Option 2: Manual Entry")
