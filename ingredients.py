@@ -4,6 +4,8 @@ from models import Ingredient, Supplier
 from datetime import datetime
 from styling import inject_custom_css, render_page_header
 from unit_conversions import BAKING_CONVERSIONS
+from allergens import ALLERGEN_CATEGORIES
+import json
 
 def show_ingredients():
     inject_custom_css()
@@ -40,7 +42,31 @@ def show_ingredients():
                         
                         with col3:
                             st.write(f"**Last Updated:** {ingredient.last_updated.strftime('%Y-%m-%d')}")
-                        
+
+                        # Show allergen information if present
+                        if ingredient.allergens or ingredient.sub_ingredients or ingredient.may_contain:
+                            st.markdown("---")
+                            st.markdown("**🏷️ Allergen Information:**")
+
+                            if ingredient.allergens:
+                                try:
+                                    allergens = json.loads(ingredient.allergens)
+                                    if allergens:
+                                        st.write(f"**Contains:** {', '.join(allergens)}")
+                                except:
+                                    pass
+
+                            if ingredient.sub_ingredients:
+                                st.write(f"**Sub-ingredients:** {ingredient.sub_ingredients}")
+
+                            if ingredient.may_contain:
+                                try:
+                                    may_contain = json.loads(ingredient.may_contain)
+                                    if may_contain:
+                                        st.write(f"**May contain:** {', '.join(may_contain)}")
+                                except:
+                                    pass
+
                         col_edit1, col_edit2 = st.columns([1, 1])
                         
                         with col_edit1:
@@ -142,7 +168,41 @@ def show_ingredients():
                 
                 lead_time = st.number_input("Supplier Lead Time (days)", min_value=1, step=1, value=7,
                     help="How many days it takes to receive an order from this supplier (only used if no supplier selected)")
-                
+
+                st.markdown("---")
+                st.markdown("### 🏷️ Natasha's Law - Allergen Information")
+                st.info("Required for compliance with food labeling laws in Northern Ireland")
+
+                # Allergen selection
+                allergen_selections = []
+                for category, allergens in ALLERGEN_CATEGORIES.items():
+                    if len(allergens) == 1:
+                        # Simple checkbox for single-item categories
+                        if st.checkbox(f"Contains {category}", key=f"allergen_{category}"):
+                            allergen_selections.extend(allergens)
+                    else:
+                        # Multi-select for categories with multiple items
+                        selected = st.multiselect(
+                            f"{category}",
+                            allergens,
+                            key=f"allergen_{category}"
+                        )
+                        allergen_selections.extend(selected)
+
+                # Sub-ingredients (for compound ingredients)
+                sub_ingredients = st.text_area(
+                    "Sub-Ingredients (for compound ingredients)",
+                    placeholder="e.g., for 'Wheat Flour': Wheat, Calcium Carbonate, Iron, Niacin, Thiamin",
+                    help="If this ingredient is made of other ingredients, list them here"
+                )
+
+                # May contain warnings
+                may_contain = st.text_input(
+                    "May contain (cross-contamination warnings)",
+                    placeholder="e.g., nuts, sesame",
+                    help="Allergens that may be present due to shared equipment"
+                )
+
                 submitted = st.form_submit_button("➕ Add Ingredient")
                 
                 if submitted:
@@ -165,6 +225,11 @@ def show_ingredients():
                                     supplier_name = supplier_obj.name
                                     supplier_lead_time = supplier_obj.lead_time_days
                             
+                            # Prepare allergen data
+                            allergens_json = json.dumps(allergen_selections) if allergen_selections else None
+                            may_contain_list = [m.strip() for m in may_contain.split(',') if m.strip()]
+                            may_contain_json = json.dumps(may_contain_list) if may_contain_list else None
+
                             new_ingredient = Ingredient(
                                 name=name,
                                 unit=unit,
@@ -172,9 +237,12 @@ def show_ingredients():
                                 current_stock=initial_stock,
                                 supplier_id=supplier_id,
                                 supplier=supplier_name,
-                                supplier_lead_time_days=supplier_lead_time
+                                supplier_lead_time_days=supplier_lead_time,
+                                allergens=allergens_json,
+                                sub_ingredients=sub_ingredients if sub_ingredients else None,
+                                may_contain=may_contain_json
                             )
-                            
+
                             session.add(new_ingredient)
                             session.commit()
                             st.success(f"✅ Added '{name}' to ingredients!")

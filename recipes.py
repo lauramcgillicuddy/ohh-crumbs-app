@@ -7,6 +7,9 @@ from unit_conversions import BAKING_CONVERSIONS
 from square_api import SquareAPI
 import pandas as pd
 from sqlalchemy import func
+from label_generator import generate_natasha_label, format_label_for_display, generate_printable_label_html
+from allergens import get_all_allergens_from_ingredients, get_may_contain_warnings
+import json
 
 def show_recipes():
     inject_custom_css()
@@ -44,15 +47,54 @@ def show_recipes():
                                 st.write(f"**Square ID:** {recipe.square_item_id}")
                         
                         st.write("**Ingredients:**")
-                        
+
                         if recipe.recipe_items:
                             for item in recipe.recipe_items:
                                 ingredient = item.ingredient
                                 item_cost = ingredient.cost_per_unit * item.quantity
                                 st.write(f"- {item.quantity:.2f} {ingredient.unit} of {ingredient.name} (£{item_cost:.2f})")
+
+                            # Show allergen information
+                            st.markdown("---")
+                            st.markdown("**🏷️ Allergen Information:**")
+
+                            allergens = get_all_allergens_from_ingredients(recipe.recipe_items)
+                            may_contain = get_may_contain_warnings(recipe.recipe_items)
+
+                            if allergens:
+                                st.warning(f"**Contains:** {', '.join(sorted(allergens))}")
+                            else:
+                                st.success("No allergens detected")
+
+                            if may_contain:
+                                st.info(f"**May contain:** {', '.join(sorted(may_contain))}")
+
+                            # Generate Label button
+                            if st.button(f"📄 Generate Natasha's Law Label", key=f"generate_label_{recipe.id}"):
+                                st.session_state[f'show_label_{recipe.id}'] = True
+
+                            # Show label if requested
+                            if st.session_state.get(f'show_label_{recipe.id}', False):
+                                st.markdown("---")
+                                st.markdown("### 📋 Natasha's Law Label")
+
+                                label = generate_natasha_label(recipe)
+                                label_text = format_label_for_display(label)
+
+                                st.markdown(label_text)
+
+                                # Printable HTML version
+                                with st.expander("🖨️ Printable HTML Version"):
+                                    html_label = generate_printable_label_html(label)
+                                    st.components.v1.html(html_label, height=600)
+
+                                if st.button("❌ Close Label", key=f"close_label_{recipe.id}"):
+                                    st.session_state[f'show_label_{recipe.id}'] = False
+                                    st.rerun()
+
                         else:
                             st.info("No ingredients added to this recipe yet.")
-                        
+
                         col_edit, col_delete = st.columns(2)
                         
                         with col_edit:

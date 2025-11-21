@@ -28,7 +28,7 @@ class Supplier(Base):
 
 class Ingredient(Base):
     __tablename__ = 'ingredients'
-    
+
     id = Column(Integer, primary_key=True)
     name = Column(String(200), nullable=False, unique=True)
     unit = Column(String(50), nullable=False)
@@ -38,17 +38,22 @@ class Ingredient(Base):
     supplier_id = Column(Integer, ForeignKey('suppliers.id'))
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     supplier_lead_time_days = Column(Integer, default=7)
-    
+
+    # Natasha's Law compliance fields
+    allergens = Column(Text)  # JSON list of allergens (14 major allergens)
+    sub_ingredients = Column(Text)  # For compound ingredients (e.g., "Wheat Flour" contains "Wheat (Gluten), Calcium Carbonate, Iron")
+    may_contain = Column(Text)  # Cross-contamination warnings
+
     recipe_items = relationship('RecipeItem', back_populates='ingredient')
     supplier_rel = relationship('Supplier', back_populates='ingredients')
-    
+
     def __repr__(self):
         return f"<Ingredient(name='{self.name}', unit='{self.unit}')>"
 
 
 class Recipe(Base):
     __tablename__ = 'recipes'
-    
+
     id = Column(Integer, primary_key=True)
     name = Column(String(200), nullable=False, unique=True)
     square_item_id = Column(String(200))
@@ -57,9 +62,13 @@ class Recipe(Base):
     description = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
+    # Natasha's Law - label info
+    storage_instructions = Column(Text)  # e.g., "Keep refrigerated", "Store in a cool, dry place"
+    use_by_days = Column(Integer)  # Days until use-by date from production
+
     recipe_items = relationship('RecipeItem', back_populates='recipe', cascade='all, delete-orphan')
-    
+
     def __repr__(self):
         return f"<Recipe(name='{self.name}', sale_price={self.sale_price})>"
 
