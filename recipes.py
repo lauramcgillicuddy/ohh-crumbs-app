@@ -351,6 +351,109 @@ def show_recipes():
                         with st.expander(f"✅ Items With Recipes ({len(items_with_recipes_sales)})"):
                             for item in items_with_recipes_sales[:10]:
                                 st.write(f"- **{item['name']}** (Sold: {item['total_sold']} units)")
-    
+
+                st.markdown("---")
+                st.markdown("### ✍️ Manual Recipe Entry")
+                st.info("Create a recipe from scratch if it's not in your sales history")
+
+                # Conversion reference
+                with st.expander("📏 Unit Conversion Reference"):
+                    st.markdown(BAKING_CONVERSIONS)
+                    st.info("💡 **Tip:** Enter quantities in the same unit as the ingredient (shown in the 'Unit' column)")
+
+                with st.form("add_recipe_form"):
+                    recipe_name = st.text_input("Recipe Name *", placeholder="e.g., Chocolate Chip Cookie")
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        sale_price = st.number_input("Sale Price (£) *", min_value=0.0, step=0.01, value=0.0)
+
+                    with col2:
+                        category = st.text_input("Category", placeholder="e.g., Cookies")
+
+                    description = st.text_area("Description (optional)", placeholder="Any notes or special instructions")
+
+                    st.write("---")
+                    st.write("**Add Ingredients to Recipe**")
+                    st.info("You can add more ingredients after creating the recipe by editing it.")
+
+                    num_ingredients = st.number_input("How many ingredients to add now?", min_value=0, max_value=20, value=3, step=1)
+
+                    ingredient_selections = []
+
+                    for i in range(int(num_ingredients)):
+                        st.write(f"**Ingredient #{i+1}**")
+                        col_ing, col_qty, col_unit = st.columns([2, 1, 1])
+
+                        with col_ing:
+                            ingredient_id = st.selectbox(
+                                "Ingredient",
+                                options=[ing.id for ing in ingredients],
+                                format_func=lambda x: next(ing.name for ing in ingredients if ing.id == x),
+                                key=f"new_recipe_ing_{i}"
+                            )
+
+                        # Get the selected ingredient to show its unit
+                        selected_ing = next(ing for ing in ingredients if ing.id == ingredient_id)
+
+                        with col_qty:
+                            quantity = st.number_input(
+                                "Quantity",
+                                min_value=0.01,
+                                step=0.1,
+                                value=1.0,
+                                key=f"new_recipe_qty_{i}"
+                            )
+
+                        with col_unit:
+                            st.text_input(
+                                "Unit",
+                                value=selected_ing.unit,
+                                disabled=True,
+                                key=f"new_recipe_unit_{i}",
+                                help=f"This ingredient is measured in {selected_ing.unit}"
+                            )
+
+                        ingredient_selections.append({'id': ingredient_id, 'quantity': quantity})
+
+                    submitted = st.form_submit_button("➕ Create Recipe")
+
+                    if submitted:
+                        if not recipe_name or sale_price <= 0:
+                            st.error("Please provide a recipe name and sale price!")
+                        else:
+                            # Check if recipe already exists
+                            existing = session.query(Recipe).filter(
+                                func.lower(Recipe.name) == recipe_name.lower()
+                            ).first()
+
+                            if existing:
+                                st.error(f"Recipe '{recipe_name}' already exists!")
+                            else:
+                                new_recipe = Recipe(
+                                    name=recipe_name,
+                                    sale_price=sale_price,
+                                    category=category,
+                                    description=description,
+                                    square_item_id=None
+                                )
+
+                                session.add(new_recipe)
+                                session.commit()
+
+                                for selection in ingredient_selections:
+                                    recipe_item = RecipeItem(
+                                        recipe_id=new_recipe.id,
+                                        ingredient_id=selection['id'],
+                                        quantity=selection['quantity']
+                                    )
+                                    session.add(recipe_item)
+
+                                session.commit()
+
+                                st.success(f"✅ Created recipe: {recipe_name} with {len(ingredient_selections)} ingredients!")
+                                st.rerun()
+
     finally:
         close_session(session)
