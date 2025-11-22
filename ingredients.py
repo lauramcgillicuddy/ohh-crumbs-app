@@ -644,15 +644,25 @@ def show_ingredients():
                 manual_code = st.text_input("Enter ingredient name or ID", placeholder="e.g., Flour, Butter, or ingredient ID", key="manual_barcode")
 
             barcode_value = scanned_code if scanned_code else manual_code
-            
+
             if barcode_value:
                 st.divider()
                 st.write(f"**Scanned/Entered Code:** `{barcode_value}`")
-                
+
+                # First try to search by name
                 ingredient = session.query(Ingredient).filter(Ingredient.name.ilike(f"%{barcode_value}%")).first()
-                
+
+                # If not found by name, try by ID (only if it's a valid small integer)
                 if not ingredient:
-                    ingredient = session.query(Ingredient).filter(Ingredient.id == barcode_value).first()
+                    try:
+                        # Try to convert to integer
+                        id_value = int(barcode_value)
+                        # Only query by ID if it's a reasonable ingredient ID (not a product barcode)
+                        if 0 < id_value < 1000000:  # Reasonable ID range
+                            ingredient = session.query(Ingredient).filter(Ingredient.id == id_value).first()
+                    except (ValueError, OverflowError):
+                        # Not a valid integer, skip ID search
+                        pass
                 
                 if ingredient:
                     st.success(f"✅ Found: **{ingredient.name}**")
