@@ -279,36 +279,80 @@ def show_ingredients():
                         st.image(uploaded_file, caption="Uploaded Image", width=300)
 
                         if st.button("🔍 Extract Ingredients from Photo", key="ocr_ingredients"):
-                            with st.spinner("Reading ingredients from photo..."):
+                            with st.spinner("🤖 Analyzing photo with AI..."):
                                 try:
-                                    from PIL import Image
-                                    import pytesseract
-                                    import io
+                                    import base64
+                                    from openai import OpenAI
 
-                                    # Open image
-                                    image = Image.open(uploaded_file)
-
-                                    # Perform OCR
-                                    extracted_text = pytesseract.image_to_string(image)
-
-                                    if extracted_text.strip():
-                                        st.success("✅ Successfully extracted text from image!")
-
-                                        # Store extracted text in session state
-                                        st.session_state['ocr_ingredients_text'] = extracted_text
-
-                                        # Display extracted text
-                                        st.text_area("Extracted Ingredients:", value=extracted_text, height=200, key="ocr_display")
-
-                                        st.info("💡 **Review the text above and use it to fill in the ingredient details below!**")
+                                    # Get API key from secrets
+                                    if "OPENAI_API_KEY" not in st.secrets:
+                                        st.error("⚠️ OpenAI API key not found in secrets. Please add it to your Streamlit secrets.")
+                                        st.info("Add `OPENAI_API_KEY = \"sk-...\"` to your `.streamlit/secrets.toml` file")
                                     else:
-                                        st.warning("❌ Could not extract text from image. Try a clearer photo!")
+                                        # Initialize OpenAI client
+                                        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-                                except ImportError:
-                                    st.error("OCR not available. Missing pytesseract or PIL.")
+                                        # Convert image to base64
+                                        uploaded_file.seek(0)  # Reset file pointer
+                                        image_bytes = uploaded_file.read()
+                                        base64_image = base64.b64encode(image_bytes).decode('utf-8')
+
+                                        # Determine image type
+                                        file_extension = uploaded_file.name.split('.')[-1].lower()
+                                        mime_type = f"image/{file_extension}" if file_extension in ['png', 'jpg', 'jpeg'] else "image/jpeg"
+
+                                        # Call GPT-4 Vision
+                                        response = client.chat.completions.create(
+                                            model="gpt-4o",
+                                            messages=[
+                                                {
+                                                    "role": "user",
+                                                    "content": [
+                                                        {
+                                                            "type": "text",
+                                                            "text": """Please carefully read and extract ALL text from the ingredients list in this product packaging photo.
+
+Extract the complete ingredient list exactly as written on the package. Include:
+- All ingredient names
+- Any sub-ingredients in parentheses
+- Percentages if shown
+- Allergen warnings if present
+
+Format: Return ONLY the ingredient text as it appears on the package, maintaining the original formatting as much as possible."""
+                                                        },
+                                                        {
+                                                            "type": "image_url",
+                                                            "image_url": {
+                                                                "url": f"data:{mime_type};base64,{base64_image}"
+                                                            }
+                                                        }
+                                                    ]
+                                                }
+                                            ],
+                                            max_tokens=1000
+                                        )
+
+                                        extracted_text = response.choices[0].message.content.strip()
+
+                                        if extracted_text:
+                                            st.success("✅ Successfully extracted ingredients using AI!")
+
+                                            # Store extracted text in session state
+                                            st.session_state['ocr_ingredients_text'] = extracted_text
+
+                                            # Display extracted text
+                                            st.text_area("Extracted Ingredients:", value=extracted_text, height=200, key="ocr_display")
+
+                                            st.info("💡 **Review the text above and use it to fill in the ingredient details below!**")
+                                        else:
+                                            st.warning("❌ Could not extract text from image. Try a clearer photo!")
+
+                                except ImportError as e:
+                                    st.error(f"Missing required library: {str(e)}")
+                                    st.info("Install with: `pip install openai`")
                                 except Exception as e:
                                     st.error(f"OCR error: {str(e)}")
-                                    st.info("Try taking a clearer photo with better lighting!")
+                                    st.info("Make sure your OpenAI API key is valid and you have credits available!")
 
                 # Process barcode lookup
                 if barcode:
