@@ -5,6 +5,7 @@ from datetime import datetime
 from styling import inject_custom_css, render_page_header
 from unit_conversions import BAKING_CONVERSIONS
 from allergens import ALLERGEN_CATEGORIES
+from common_ingredients import get_allergen_template, suggest_allergen_template
 import json
 
 def show_ingredients():
@@ -15,7 +16,7 @@ def show_ingredients():
     session = get_session()
     
     try:
-        tab1, tab2, tab3, tab4 = st.tabs(["📋 View Ingredients", "➕ Add Ingredient", "📦 Update Stock", "📱 Barcode Scanner"])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 View Ingredients", "➕ Add Ingredient", "📦 Update Stock", "📱 Barcode Scanner", "⚠️ Allergen Audit"])
         
         with tab1:
             st.subheader("Current Ingredients")
@@ -24,13 +25,26 @@ def show_ingredients():
             
             if ingredients:
                 for ingredient in ingredients:
-                    with st.expander(f"{ingredient.name} ({ingredient.unit})"):
+                    # Check if allergen info is missing
+                    has_allergen_info = ingredient.allergens or ingredient.sub_ingredients
+                    warning_icon = "" if has_allergen_info else " ⚠️"
+
+                    with st.expander(f"{ingredient.name} ({ingredient.unit}){warning_icon}"):
+                        # Show warning if allergen info is missing
+                        if not has_allergen_info:
+                            st.error("⚠️ **ALLERGEN DATA MISSING** - This ingredient needs allergen information for Natasha's Law compliance!")
+
+                            # Check if there's a template suggestion
+                            suggestion = suggest_allergen_template(ingredient.name)
+                            if suggestion:
+                                st.info(suggestion)
+
                         col1, col2, col3 = st.columns(3)
-                        
+
                         with col1:
                             st.write(f"**Cost per {ingredient.unit}:** £{ingredient.cost_per_unit:.2f}")
                             st.write(f"**Current Stock:** {ingredient.current_stock:.2f} {ingredient.unit}")
-                        
+
                         with col2:
                             supplier_name = ingredient.supplier
                             if ingredient.supplier_id:
@@ -39,7 +53,7 @@ def show_ingredients():
                                     supplier_name = supplier_obj.name
                             st.write(f"**Supplier:** {supplier_name or 'Not set'}")
                             st.write(f"**Lead Time:** {ingredient.supplier_lead_time_days} days")
-                        
+
                         with col3:
                             st.write(f"**Last Updated:** {ingredient.last_updated.strftime('%Y-%m-%d')}")
 
@@ -106,6 +120,12 @@ def show_ingredients():
 
                                 st.markdown("---")
                                 st.markdown("### 🏷️ Allergen Information")
+                                st.warning("⚠️ **Complete this section for Natasha's Law compliance!**")
+
+                                # Check if there's a suggested template
+                                suggestion = suggest_allergen_template(ingredient.name)
+                                if suggestion and (not ingredient.allergens and not ingredient.sub_ingredients):
+                                    st.info(suggestion)
 
                                 # Get existing allergens
                                 existing_allergens = []
@@ -121,7 +141,8 @@ def show_ingredients():
                                     if len(allergens_list) == 1:
                                         # Simple checkbox for single-item categories
                                         default_value = allergens_list[0] in existing_allergens
-                                        if st.checkbox(f"Contains {category}", value=default_value, key=f"edit_allergen_{ingredient.id}_{category}"):
+                                        if st.checkbox(f"Contains {category}", value=default_value, key=f"edit_allergen_{ingredient.id}_{category}",
+                                                     help=f"Check if this ingredient contains {category}"):
                                             allergen_selections.extend(allergens_list)
                                     else:
                                         # Multi-select for categories with multiple items
@@ -130,16 +151,18 @@ def show_ingredients():
                                             f"{category}",
                                             allergens_list,
                                             default=default_selections,
-                                            key=f"edit_allergen_{ingredient.id}_{category}"
+                                            key=f"edit_allergen_{ingredient.id}_{category}",
+                                            help=f"Select all {category} allergens that apply"
                                         )
                                         allergen_selections.extend(selected)
 
                                 # Sub-ingredients
                                 sub_ingredients_edit = st.text_area(
-                                    "Sub-Ingredients",
+                                    "Sub-Ingredients (for compound ingredients)",
                                     value=ingredient.sub_ingredients or "",
                                     placeholder="e.g., Wheat, Calcium Carbonate, Iron",
-                                    key=f"edit_sub_ing_{ingredient.id}"
+                                    key=f"edit_sub_ing_{ingredient.id}",
+                                    help="⚠️ IMPORTANT: If this ingredient is made of other ingredients, list them ALL here. This appears on the label!"
                                 )
 
                                 # May contain
@@ -152,10 +175,11 @@ def show_ingredients():
                                         existing_may_contain = ingredient.may_contain or ""
 
                                 may_contain_input = st.text_input(
-                                    "May contain",
+                                    "May contain (cross-contamination)",
                                     value=existing_may_contain,
                                     placeholder="e.g., nuts, sesame",
-                                    key=f"edit_may_contain_{ingredient.id}"
+                                    key=f"edit_may_contain_{ingredient.id}",
+                                    help="⚠️ IMPORTANT: List allergens that may be present due to shared equipment"
                                 )
 
                                 col_submit, col_cancel = st.columns(2)
@@ -234,36 +258,66 @@ def show_ingredients():
 
                 st.markdown("---")
                 st.markdown("### 🏷️ Natasha's Law - Allergen Information")
-                st.info("Required for compliance with food labeling laws in Northern Ireland")
+                st.info("⚠️ **IMPORTANT:** Allergen information is required for Natasha's Law compliance in Northern Ireland. Complete this section for every ingredient!")
 
-                # Allergen selection
+                # Check if we have a template for this ingredient name
+                template = None
+                if name:
+                    template = get_allergen_template(name)
+                    if template:
+                        st.success(f"💡 **Smart Suggestion:** Allergen data auto-filled for '{name}'. Review and adjust if needed!")
+
+                # Allergen selection (with template defaults if available)
                 allergen_selections = []
                 for category, allergens in ALLERGEN_CATEGORIES.items():
                     if len(allergens) == 1:
+                        # Check if this allergen is in the template
+                        default_checked = False
+                        if template and allergens[0] in template['allergens']:
+                            default_checked = True
+
                         # Simple checkbox for single-item categories
-                        if st.checkbox(f"Contains {category}", key=f"allergen_{category}"):
+                        if st.checkbox(f"Contains {category}", value=default_checked, key=f"allergen_{category}",
+                                     help=f"Check if this ingredient contains {category}"):
                             allergen_selections.extend(allergens)
                     else:
+                        # Get default selections from template
+                        default_selections = []
+                        if template:
+                            default_selections = [a for a in allergens if a in template['allergens']]
+
                         # Multi-select for categories with multiple items
                         selected = st.multiselect(
                             f"{category}",
                             allergens,
-                            key=f"allergen_{category}"
+                            default=default_selections,
+                            key=f"allergen_{category}",
+                            help=f"Select all {category} allergens that apply"
                         )
                         allergen_selections.extend(selected)
 
                 # Sub-ingredients (for compound ingredients)
+                default_sub_ingredients = ""
+                if template and template['sub_ingredients']:
+                    default_sub_ingredients = template['sub_ingredients']
+
                 sub_ingredients = st.text_area(
                     "Sub-Ingredients (for compound ingredients)",
+                    value=default_sub_ingredients,
                     placeholder="e.g., for 'Wheat Flour': Wheat, Calcium Carbonate, Iron, Niacin, Thiamin",
-                    help="If this ingredient is made of other ingredients, list them here"
+                    help="⚠️ IMPORTANT: If this ingredient is made of other ingredients, list them ALL here. This appears on the label!"
                 )
 
                 # May contain warnings
+                default_may_contain = ""
+                if template and template['may_contain']:
+                    default_may_contain = ", ".join(template['may_contain'])
+
                 may_contain = st.text_input(
                     "May contain (cross-contamination warnings)",
+                    value=default_may_contain,
                     placeholder="e.g., nuts, sesame",
-                    help="Allergens that may be present due to shared equipment"
+                    help="⚠️ IMPORTANT: List allergens that may be present due to shared equipment or manufacturing facility"
                 )
 
                 submitted = st.form_submit_button("➕ Add Ingredient")
@@ -480,6 +534,89 @@ def show_ingredients():
                     
                     if len(ingredients) > 10:
                         st.write(f"...and {len(ingredients) - 10} more")
-    
+
+        with tab5:
+            st.subheader("⚠️ Allergen Information Audit")
+            st.info("This audit shows which ingredients are missing allergen data required for Natasha's Law compliance.")
+
+            ingredients = session.query(Ingredient).order_by(Ingredient.name).all()
+
+            if not ingredients:
+                st.warning("No ingredients found. Add ingredients first!")
+            else:
+                # Categorize ingredients
+                complete_ingredients = []
+                incomplete_ingredients = []
+
+                for ing in ingredients:
+                    has_allergen_info = ing.allergens or ing.sub_ingredients
+                    if has_allergen_info:
+                        complete_ingredients.append(ing)
+                    else:
+                        incomplete_ingredients.append(ing)
+
+                # Show summary
+                total = len(ingredients)
+                complete_count = len(complete_ingredients)
+                incomplete_count = len(incomplete_ingredients)
+                completion_pct = (complete_count / total * 100) if total > 0 else 0
+
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    st.metric("Total Ingredients", total)
+
+                with col2:
+                    st.metric("✅ Complete", complete_count)
+
+                with col3:
+                    st.metric("⚠️ Missing Data", incomplete_count)
+
+                # Progress bar
+                st.progress(completion_pct / 100, text=f"Allergen Data Completion: {completion_pct:.1f}%")
+
+                st.markdown("---")
+
+                # Show incomplete ingredients first (priority)
+                if incomplete_ingredients:
+                    st.error(f"**⚠️ {incomplete_count} Ingredient(s) Need Allergen Data:**")
+
+                    for ing in incomplete_ingredients:
+                        col_name, col_action = st.columns([3, 1])
+
+                        with col_name:
+                            st.write(f"**{ing.name}** ({ing.unit})")
+
+                            # Show suggestion if available
+                            suggestion = suggest_allergen_template(ing.name)
+                            if suggestion:
+                                st.caption(suggestion)
+
+                        with col_action:
+                            if st.button("✏️ Edit", key=f"audit_edit_{ing.id}"):
+                                # Set editing state and switch to View tab
+                                st.session_state[f'editing_{ing.id}'] = True
+                                st.info("👆 Switched to 'View Ingredients' tab. Look for the ingredient you selected!")
+                                st.rerun()
+
+                        st.markdown("---")
+                else:
+                    st.success("🎉 **Excellent!** All ingredients have allergen information!")
+
+                # Show complete ingredients
+                if complete_ingredients:
+                    with st.expander(f"✅ View Complete Ingredients ({complete_count})"):
+                        for ing in complete_ingredients:
+                            st.write(f"✅ **{ing.name}** ({ing.unit})")
+
+                            # Show what allergens it has
+                            if ing.allergens:
+                                try:
+                                    allergens = json.loads(ing.allergens)
+                                    if allergens:
+                                        st.caption(f"Contains: {', '.join(allergens)}")
+                                except:
+                                    pass
+
     finally:
         close_session(session)

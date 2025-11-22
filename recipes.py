@@ -79,8 +79,16 @@ def show_recipes():
                                 st.markdown("### 📋 Natasha's Law Label")
 
                                 label = generate_natasha_label(recipe)
-                                label_text = format_label_for_display(label)
 
+                                # Show warnings if allergen info is incomplete
+                                if not label['is_complete']:
+                                    st.error(f"⚠️ **INCOMPLETE ALLERGEN DATA** - The following ingredients are missing allergen information:")
+                                    for ing_name in label['missing_allergen_info']:
+                                        st.write(f"  • {ing_name}")
+                                    st.warning("🔧 Go to the **Ingredients** page to add allergen information for these ingredients before using this label!")
+                                    st.markdown("---")
+
+                                label_text = format_label_for_display(label)
                                 st.markdown(label_text)
 
                                 # Printable HTML version - use a checkbox instead of expander
