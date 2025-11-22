@@ -253,7 +253,7 @@ def show_ingredients():
 
             scanned_product = None
             if scanner_available:
-                scan_mode = st.radio("Product lookup:", ["⌨️ Manual Entry", "📷 Scan Barcode", "🔢 Type Barcode Number"], horizontal=True, key="product_scan_mode")
+                scan_mode = st.radio("Product lookup:", ["⌨️ Manual Entry", "📷 Scan Barcode", "🔢 Type Barcode Number", "📸 Photo of Ingredients"], horizontal=True, key="product_scan_mode")
 
                 barcode = None
 
@@ -268,8 +268,47 @@ def show_ingredients():
                 elif scan_mode == "🔢 Type Barcode Number":
                     st.caption("🔢 Type or paste the barcode number from the product packaging")
                     barcode_input = st.text_input("Barcode number:", placeholder="e.g., 5000169000250", key="manual_barcode_input")
-                    if st.button("🔍 Look Up Product", key="lookup_barcode"):
-                        barcode = barcode_input
+                    if st.button("🔍 Look Up Product", key="lookup_barcode") and barcode_input:
+                        barcode = barcode_input.strip()
+
+                elif scan_mode == "📸 Photo of Ingredients":
+                    st.caption("📸 Take or upload a photo of the ingredients list on the product packaging")
+                    uploaded_file = st.file_uploader("Upload ingredient photo", type=['png', 'jpg', 'jpeg'], key="ingredient_photo")
+
+                    if uploaded_file is not None:
+                        st.image(uploaded_file, caption="Uploaded Image", width=300)
+
+                        if st.button("🔍 Extract Ingredients from Photo", key="ocr_ingredients"):
+                            with st.spinner("Reading ingredients from photo..."):
+                                try:
+                                    from PIL import Image
+                                    import pytesseract
+                                    import io
+
+                                    # Open image
+                                    image = Image.open(uploaded_file)
+
+                                    # Perform OCR
+                                    extracted_text = pytesseract.image_to_string(image)
+
+                                    if extracted_text.strip():
+                                        st.success("✅ Successfully extracted text from image!")
+
+                                        # Store extracted text in session state
+                                        st.session_state['ocr_ingredients_text'] = extracted_text
+
+                                        # Display extracted text
+                                        st.text_area("Extracted Ingredients:", value=extracted_text, height=200, key="ocr_display")
+
+                                        st.info("💡 **Review the text above and use it to fill in the ingredient details below!**")
+                                    else:
+                                        st.warning("❌ Could not extract text from image. Try a clearer photo!")
+
+                                except ImportError:
+                                    st.error("OCR not available. Missing pytesseract or PIL.")
+                                except Exception as e:
+                                    st.error(f"OCR error: {str(e)}")
+                                    st.info("Try taking a clearer photo with better lighting!")
 
                 # Process barcode lookup
                 if barcode:
@@ -303,13 +342,22 @@ def show_ingredients():
             else:
                 st.caption("🔍 Barcode scanner not available. Fill in ingredient details manually below.")
 
-            # Check if we have scanned product data
+            # Check if we have scanned product data or OCR text
             if 'scanned_product' in st.session_state:
                 scanned_product = st.session_state['scanned_product']
 
                 # Add clear button
                 if st.button("🗑️ Clear Scanned Data & Start Fresh", key="clear_scan"):
                     del st.session_state['scanned_product']
+                    if 'ocr_ingredients_text' in st.session_state:
+                        del st.session_state['ocr_ingredients_text']
+                    st.rerun()
+
+            elif 'ocr_ingredients_text' in st.session_state:
+                # Show clear OCR button if we have OCR text but no scanned product
+                st.success(f"✅ Photo text extracted! Review below in the form.")
+                if st.button("🗑️ Clear Photo Text & Start Fresh", key="clear_ocr"):
+                    del st.session_state['ocr_ingredients_text']
                     st.rerun()
 
             st.markdown("---")
@@ -419,6 +467,10 @@ def show_ingredients():
                     default_sub_ingredients = scanned_ingredients_text
                 elif allergen_source == "template" and template and template['sub_ingredients']:
                     default_sub_ingredients = template['sub_ingredients']
+                elif 'ocr_ingredients_text' in st.session_state:
+                    # Use OCR text if available
+                    default_sub_ingredients = st.session_state['ocr_ingredients_text']
+                    st.success("💡 **From Photo:** Ingredients text extracted from your uploaded photo!")
 
                 sub_ingredients = st.text_area(
                     "Sub-Ingredients (for compound ingredients)",
@@ -498,9 +550,11 @@ def show_ingredients():
                             session.add(new_ingredient)
                             session.commit()
 
-                            # Clear scanned product from session state
+                            # Clear scanned product and OCR text from session state
                             if 'scanned_product' in st.session_state:
                                 del st.session_state['scanned_product']
+                            if 'ocr_ingredients_text' in st.session_state:
+                                del st.session_state['ocr_ingredients_text']
 
                             if auto_template and (not allergen_selections and not sub_ingredients):
                                 st.success(f"✅ Added '{name}' with auto-filled allergen data from template!")

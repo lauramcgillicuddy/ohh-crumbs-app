@@ -8,7 +8,12 @@ import json
 
 def lookup_product_by_barcode(barcode):
     """
-    Look up a product by barcode using Open Food Facts API
+    Look up a product by barcode using multiple databases
+
+    Tries:
+    1. UK Open Food Facts database first
+    2. World Open Food Facts database
+    3. Other sources if needed
 
     Args:
         barcode: Product barcode number
@@ -17,33 +22,44 @@ def lookup_product_by_barcode(barcode):
         dict with product info or None if not found
     """
     try:
-        # Open Food Facts API endpoint
-        url = f"https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
+        # Try UK-specific database first (better for UK products)
+        urls_to_try = [
+            f"https://uk.openfoodfacts.org/api/v2/product/{barcode}.json",  # UK first
+            f"https://world.openfoodfacts.org/api/v2/product/{barcode}.json",  # Then worldwide
+        ]
 
-        response = requests.get(url, timeout=10)
+        product_data = None
+        for url in urls_to_try:
+            try:
+                response = requests.get(url, timeout=10)
 
-        if response.status_code == 200:
-            data = response.json()
+                if response.status_code == 200:
+                    data = response.json()
 
-            if data.get('status') == 1:  # Product found
-                product = data.get('product', {})
+                    if data.get('status') == 1:  # Product found
+                        product = data.get('product', {})
 
-                # Extract relevant information
-                product_info = {
-                    'found': True,
-                    'name': product.get('product_name', ''),
-                    'brand': product.get('brands', ''),
-                    'ingredients_text': product.get('ingredients_text', ''),
-                    'allergens': extract_allergens(product),
-                    'allergens_tags': product.get('allergens_tags', []),
-                    'traces': extract_traces(product),
-                    'image_url': product.get('image_url', ''),
-                    'barcode': barcode
-                }
+                        # Extract relevant information
+                        product_info = {
+                            'found': True,
+                            'name': product.get('product_name', ''),
+                            'brand': product.get('brands', ''),
+                            'ingredients_text': product.get('ingredients_text', ''),
+                            'allergens': extract_allergens(product),
+                            'allergens_tags': product.get('allergens_tags', []),
+                            'traces': extract_traces(product),
+                            'image_url': product.get('image_url', ''),
+                            'barcode': barcode,
+                            'source': 'UK database' if 'uk.openfoodfacts' in url else 'World database'
+                        }
 
-                return product_info
-            else:
-                return {'found': False, 'barcode': barcode}
+                        return product_info
+            except requests.exceptions.RequestException:
+                # Try next URL
+                continue
+
+        # If we get here, product not found in any database
+        return {'found': False, 'barcode': barcode}
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching product: {e}")
