@@ -83,10 +83,11 @@ def show_recipes():
 
                                 st.markdown(label_text)
 
-                                # Printable HTML version
-                                with st.expander("🖨️ Printable HTML Version"):
+                                # Printable HTML version - use a checkbox instead of expander
+                                show_html = st.checkbox("🖨️ Show Printable HTML Version", key=f"show_html_{recipe.id}")
+                                if show_html:
                                     html_label = generate_printable_label_html(label)
-                                    st.components.v1.html(html_label, height=600)
+                                    st.components.v1.html(html_label, height=600, scrolling=True)
 
                                 if st.button("❌ Close Label", key=f"close_label_{recipe.id}"):
                                     st.session_state[f'show_label_{recipe.id}'] = False

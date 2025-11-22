@@ -103,7 +103,61 @@ def show_ingredients():
                                 
                                 selected_supplier = st.selectbox("Supplier", supplier_options, index=current_index)
                                 new_lead_time = st.number_input("Lead time (days)", value=ingredient.supplier_lead_time_days, min_value=1, step=1)
-                                
+
+                                st.markdown("---")
+                                st.markdown("### 🏷️ Allergen Information")
+
+                                # Get existing allergens
+                                existing_allergens = []
+                                if ingredient.allergens:
+                                    try:
+                                        existing_allergens = json.loads(ingredient.allergens)
+                                    except:
+                                        pass
+
+                                # Allergen selection
+                                allergen_selections = []
+                                for category, allergens_list in ALLERGEN_CATEGORIES.items():
+                                    if len(allergens_list) == 1:
+                                        # Simple checkbox for single-item categories
+                                        default_value = allergens_list[0] in existing_allergens
+                                        if st.checkbox(f"Contains {category}", value=default_value, key=f"edit_allergen_{ingredient.id}_{category}"):
+                                            allergen_selections.extend(allergens_list)
+                                    else:
+                                        # Multi-select for categories with multiple items
+                                        default_selections = [a for a in allergens_list if a in existing_allergens]
+                                        selected = st.multiselect(
+                                            f"{category}",
+                                            allergens_list,
+                                            default=default_selections,
+                                            key=f"edit_allergen_{ingredient.id}_{category}"
+                                        )
+                                        allergen_selections.extend(selected)
+
+                                # Sub-ingredients
+                                sub_ingredients_edit = st.text_area(
+                                    "Sub-Ingredients",
+                                    value=ingredient.sub_ingredients or "",
+                                    placeholder="e.g., Wheat, Calcium Carbonate, Iron",
+                                    key=f"edit_sub_ing_{ingredient.id}"
+                                )
+
+                                # May contain
+                                existing_may_contain = ""
+                                if ingredient.may_contain:
+                                    try:
+                                        may_contain_list = json.loads(ingredient.may_contain)
+                                        existing_may_contain = ", ".join(may_contain_list)
+                                    except:
+                                        existing_may_contain = ingredient.may_contain or ""
+
+                                may_contain_input = st.text_input(
+                                    "May contain",
+                                    value=existing_may_contain,
+                                    placeholder="e.g., nuts, sesame",
+                                    key=f"edit_may_contain_{ingredient.id}"
+                                )
+
                                 col_submit, col_cancel = st.columns(2)
                                 
                                 with col_submit:
@@ -122,7 +176,16 @@ def show_ingredients():
                                         
                                         if not ingredient.supplier_id:
                                             ingredient.supplier_lead_time_days = new_lead_time
-                                        
+
+                                        # Save allergen data
+                                        allergens_json = json.dumps(allergen_selections) if allergen_selections else None
+                                        may_contain_list = [m.strip() for m in may_contain_input.split(',') if m.strip()]
+                                        may_contain_json = json.dumps(may_contain_list) if may_contain_list else None
+
+                                        ingredient.allergens = allergens_json
+                                        ingredient.sub_ingredients = sub_ingredients_edit if sub_ingredients_edit else None
+                                        ingredient.may_contain = may_contain_json
+
                                         ingredient.last_updated = datetime.utcnow()
                                         session.commit()
                                         st.session_state[f'editing_{ingredient.id}'] = False
