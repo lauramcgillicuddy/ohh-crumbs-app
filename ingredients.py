@@ -441,21 +441,28 @@ def show_ingredients():
         
         with tab4:
             st.subheader("📱 Barcode/QR Scanner for Inventory")
-            
-            st.info("💡 **How it works:** Scan a barcode or QR code to quickly look up and update ingredient inventory. Each ingredient can have a unique code.")
-            
-            from streamlit_qrcode_scanner import qrcode_scanner
-            
-            col_scan1, col_scan2 = st.columns([1, 1])
-            
-            with col_scan1:
-                st.write("**Scan a Code:**")
-                scanned_code = qrcode_scanner(key='ingredient_scanner')
-            
-            with col_scan2:
-                st.write("**Manual Entry:**")
-                manual_code = st.text_input("Or enter code manually", placeholder="e.g., FLOUR001", key="manual_barcode")
-            
+
+            st.info("💡 **How it works:** Enter an ingredient name or ID to quickly look up and update ingredient inventory.")
+
+            # Try to import the QR scanner package, but don't fail if it's not available
+            scanned_code = None
+            try:
+                from streamlit_qrcode_scanner import qrcode_scanner
+
+                col_scan1, col_scan2 = st.columns([1, 1])
+
+                with col_scan1:
+                    st.write("**Scan a Code:**")
+                    scanned_code = qrcode_scanner(key='ingredient_scanner')
+
+                with col_scan2:
+                    st.write("**Manual Entry:**")
+                    manual_code = st.text_input("Or enter code manually", placeholder="e.g., FLOUR001 or Flour", key="manual_barcode")
+            except ImportError:
+                # If scanner not available, just use manual entry
+                st.write("**Search for Ingredient:**")
+                manual_code = st.text_input("Enter ingredient name or ID", placeholder="e.g., Flour, Butter, or ingredient ID", key="manual_barcode")
+
             barcode_value = scanned_code if scanned_code else manual_code
             
             if barcode_value:
