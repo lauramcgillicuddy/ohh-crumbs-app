@@ -165,7 +165,7 @@ class SupplierOrderItem(Base):
 
 class ProfitHistory(Base):
     __tablename__ = 'profit_history'
-    
+
     id = Column(Integer, primary_key=True)
     recipe_id = Column(Integer, ForeignKey('recipes.id'), nullable=False)
     date = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -174,6 +174,20 @@ class ProfitHistory(Base):
     profit = Column(Float, default=0.0)
     profit_margin = Column(Float, default=0.0)
     quantity_sold = Column(Integer, default=1)
-    
+
     def __repr__(self):
         return f"<ProfitHistory(recipe_id={self.recipe_id}, date={self.date}, profit_margin={self.profit_margin:.2f}%)>"
+
+
+class ProductionBatch(Base):
+    __tablename__ = 'production_batches'
+
+    id = Column(Integer, primary_key=True)
+    recipe_id = Column(Integer, ForeignKey('recipes.id'), nullable=False)
+    quantity_produced = Column(Float, nullable=False)  # Number of servings/items made
+    production_date = Column(DateTime, default=datetime.utcnow)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<ProductionBatch(id={self.id}, recipe_id={self.recipe_id}, quantity={self.quantity_produced})>"

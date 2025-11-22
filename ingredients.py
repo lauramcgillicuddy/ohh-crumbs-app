@@ -98,9 +98,17 @@ def show_ingredients():
                         if st.session_state.get(f'editing_{ingredient.id}', False):
                             with st.form(key=f"edit_form_{ingredient.id}"):
                                 st.write("**Edit Ingredient**")
-                                
-                                new_cost = st.number_input("Cost per unit", value=float(ingredient.cost_per_unit), min_value=0.0, step=0.01)
-                                
+
+                                col_cost, col_unit = st.columns(2)
+
+                                with col_cost:
+                                    new_cost = st.number_input("Cost per unit", value=float(ingredient.cost_per_unit), min_value=0.0, step=0.01)
+
+                                with col_unit:
+                                    available_units = ["kg", "g", "lb", "oz", "L", "mL", "cups", "tbsp", "tsp", "units"]
+                                    current_unit_index = available_units.index(ingredient.unit) if ingredient.unit in available_units else 0
+                                    new_unit = st.selectbox("Unit", available_units, index=current_unit_index)
+
                                 suppliers = session.query(Supplier).order_by(Supplier.name).all()
                                 supplier_options = ["None"] + [s.name for s in suppliers]
                                 
@@ -200,7 +208,8 @@ def show_ingredients():
                                 with col_submit:
                                     if st.form_submit_button("💾 Save"):
                                         ingredient.cost_per_unit = new_cost
-                                        
+                                        ingredient.unit = new_unit
+
                                         if selected_supplier == "None":
                                             ingredient.supplier_id = None
                                             ingredient.supplier = None
