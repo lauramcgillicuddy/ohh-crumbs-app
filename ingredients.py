@@ -442,25 +442,38 @@ def show_ingredients():
         with tab4:
             st.subheader("📱 Barcode/QR Scanner for Inventory")
 
-            st.info("💡 **How it works:** Enter an ingredient name or ID to quickly look up and update ingredient inventory.")
+            st.info("💡 **How it works:** Search for an ingredient by name to quickly update inventory.")
 
-            # Try to import the QR scanner package, but don't fail if it's not available
+            # Try to import the QR scanner package
             scanned_code = None
+            scanner_available = False
             try:
                 from streamlit_qrcode_scanner import qrcode_scanner
-
-                col_scan1, col_scan2 = st.columns([1, 1])
-
-                with col_scan1:
-                    st.write("**Scan a Code:**")
-                    scanned_code = qrcode_scanner(key='ingredient_scanner')
-
-                with col_scan2:
-                    st.write("**Manual Entry:**")
-                    manual_code = st.text_input("Or enter code manually", placeholder="e.g., FLOUR001 or Flour", key="manual_barcode")
+                scanner_available = True
             except ImportError:
-                # If scanner not available, just use manual entry
-                st.write("**Search for Ingredient:**")
+                pass
+
+            if scanner_available:
+                # Show scanner option
+                scan_mode = st.radio("Choose input method:", ["🔍 Search by Name", "📷 Scan QR Code"], horizontal=True)
+
+                if scan_mode == "📷 Scan QR Code":
+                    st.write("**📷 Camera Scanner:**")
+                    st.caption("Allow camera access when prompted. The scanner will appear below.")
+                    try:
+                        scanned_code = qrcode_scanner(key='ingredient_scanner')
+                    except Exception as e:
+                        st.error(f"Scanner error: {str(e)}")
+                        st.info("Try using the 'Search by Name' option instead!")
+
+                    st.write("**Or enter manually:**")
+                    manual_code = st.text_input("Type ingredient name", placeholder="e.g., Flour, Butter", key="manual_barcode")
+                else:
+                    st.write("**🔍 Search for Ingredient:**")
+                    manual_code = st.text_input("Enter ingredient name or ID", placeholder="e.g., Flour, Butter, or ingredient ID", key="manual_barcode")
+            else:
+                # Fallback if scanner not available
+                st.write("**🔍 Search for Ingredient:**")
                 manual_code = st.text_input("Enter ingredient name or ID", placeholder="e.g., Flour, Butter, or ingredient ID", key="manual_barcode")
 
             barcode_value = scanned_code if scanned_code else manual_code
