@@ -6,6 +6,7 @@ from styling import inject_custom_css, render_page_header
 from unit_conversions import BAKING_CONVERSIONS
 from allergens import ALLERGEN_CATEGORIES
 from common_ingredients import get_allergen_template, suggest_allergen_template
+from product_lookup import lookup_product_by_barcode, map_to_natasha_allergens
 import json
 
 def show_ingredients():
@@ -238,13 +239,79 @@ def show_ingredients():
         with tab2:
             st.subheader("Add New Ingredient")
 
+            # Barcode Scanner for Product Lookup
+            st.markdown("### 📱 Scan Product Barcode (Optional)")
+            st.info("💡 Scan a product barcode to auto-fill allergen information from the product packaging!")
+
+            # Try to import scanner
+            scanner_available = False
+            try:
+                from streamlit_qrcode_scanner import qrcode_scanner
+                scanner_available = True
+            except ImportError:
+                pass
+
+            scanned_product = None
+            if scanner_available:
+                scan_mode = st.radio("Product lookup:", ["⌨️ Manual Entry", "📷 Scan Barcode"], horizontal=True, key="product_scan_mode")
+
+                if scan_mode == "📷 Scan Barcode":
+                    st.caption("📷 Point your camera at the product barcode. Allow camera access if prompted.")
+                    try:
+                        barcode = qrcode_scanner(key='product_barcode_scanner')
+                        if barcode:
+                            st.info(f"Scanned barcode: {barcode}")
+                            with st.spinner("Looking up product..."):
+                                product_data = lookup_product_by_barcode(barcode)
+
+                                if product_data.get('found'):
+                                    st.success(f"✅ Found: **{product_data['name']}** ({product_data['brand']})")
+
+                                    # Store in session state
+                                    st.session_state['scanned_product'] = product_data
+
+                                    if product_data.get('image_url'):
+                                        col_img, col_info = st.columns([1, 2])
+                                        with col_img:
+                                            st.image(product_data['image_url'], width=150)
+                                        with col_info:
+                                            if product_data['allergens']:
+                                                st.write(f"**Allergens:** {', '.join(product_data['allergens'])}")
+                                            if product_data['traces']:
+                                                st.write(f"**May contain:** {', '.join(product_data['traces'])}")
+                                else:
+                                    st.warning(f"Product not found in database for barcode: {barcode}")
+                    except Exception as e:
+                        st.error(f"Scanner error: {str(e)}")
+                        st.info("Try manual entry instead!")
+            else:
+                st.caption("🔍 Barcode scanner not available. Fill in ingredient details manually below.")
+
+            # Check if we have scanned product data
+            if 'scanned_product' in st.session_state:
+                scanned_product = st.session_state['scanned_product']
+
+                # Add clear button
+                if st.button("🗑️ Clear Scanned Data & Start Fresh", key="clear_scan"):
+                    del st.session_state['scanned_product']
+                    st.rerun()
+
+            st.markdown("---")
+
             # Conversion reference
             with st.expander("📏 Unit Conversion Reference"):
                 st.markdown(BAKING_CONVERSIONS)
 
             with st.form("add_ingredient_form"):
-                name = st.text_input("Ingredient Name *", placeholder="e.g., All-Purpose Flour")
-                
+                # Pre-fill name from scanned product if available
+                default_name = ""
+                if scanned_product and scanned_product.get('found'):
+                    product_name = scanned_product.get('name', '')
+                    brand = scanned_product.get('brand', '')
+                    default_name = f"{brand} {product_name}".strip() if brand else product_name
+
+                name = st.text_input("Ingredient Name *", value=default_name, placeholder="e.g., All-Purpose Flour")
+
                 col1, col2 = st.columns(2)
                 
                 with col1:
@@ -270,32 +337,54 @@ def show_ingredients():
 
                 st.markdown("---")
                 st.markdown("### 🏷️ Natasha's Law - Allergen Information")
-                st.info("⚠️ **IMPORTANT:** Allergen information is required for Natasha's Law compliance in Northern Ireland. Complete this section for every ingredient!")
 
-                # Check if we have a template for this ingredient name
-                template = None
-                if name:
-                    template = get_allergen_template(name)
-                    if template:
-                        st.success(f"💡 **Smart Suggestion:** Allergen data auto-filled for '{name}'. Review and adjust if needed!")
+                # Determine allergen source: scanned product or template
+                allergen_source = None
+                scanned_allergens = []
+                scanned_traces = []
+                scanned_ingredients_text = ""
 
-                # Allergen selection (with template defaults if available)
+                if scanned_product and scanned_product.get('found'):
+                    # Use scanned product data
+                    allergen_source = "scanned"
+                    raw_allergens = scanned_product.get('allergens', [])
+                    scanned_allergens = map_to_natasha_allergens(raw_allergens)
+                    raw_traces = scanned_product.get('traces', [])
+                    scanned_traces = map_to_natasha_allergens(raw_traces)
+                    scanned_ingredients_text = scanned_product.get('ingredients_text', '')
+                    st.success(f"💡 **From Scanned Product:** Allergen data auto-filled from product packaging!")
+                else:
+                    # Check if we have a template for this ingredient name
+                    template = None
+                    if name:
+                        template = get_allergen_template(name)
+                        if template:
+                            allergen_source = "template"
+                            st.success(f"💡 **Smart Suggestion:** Allergen data auto-filled for '{name}'. Review and adjust if needed!")
+
+                st.info("⚠️ **IMPORTANT:** Allergen information is required for Natasha's Law compliance in Northern Ireland. Review and adjust if needed!")
+
+                # Allergen selection (with scanned product or template defaults)
                 allergen_selections = []
                 for category, allergens in ALLERGEN_CATEGORIES.items():
                     if len(allergens) == 1:
-                        # Check if this allergen is in the template
+                        # Check if this allergen is in the scanned product or template
                         default_checked = False
-                        if template and allergens[0] in template['allergens']:
-                            default_checked = True
+                        if allergen_source == "scanned":
+                            default_checked = allergens[0] in scanned_allergens
+                        elif allergen_source == "template" and template:
+                            default_checked = allergens[0] in template['allergens']
 
                         # Simple checkbox for single-item categories
                         if st.checkbox(f"Contains {category}", value=default_checked, key=f"allergen_{category}",
                                      help=f"Check if this ingredient contains {category}"):
                             allergen_selections.extend(allergens)
                     else:
-                        # Get default selections from template
+                        # Get default selections from scanned product or template
                         default_selections = []
-                        if template:
+                        if allergen_source == "scanned":
+                            default_selections = [a for a in allergens if a in scanned_allergens]
+                        elif allergen_source == "template" and template:
                             default_selections = [a for a in allergens if a in template['allergens']]
 
                         # Multi-select for categories with multiple items
@@ -310,7 +399,9 @@ def show_ingredients():
 
                 # Sub-ingredients (for compound ingredients)
                 default_sub_ingredients = ""
-                if template and template['sub_ingredients']:
+                if allergen_source == "scanned" and scanned_ingredients_text:
+                    default_sub_ingredients = scanned_ingredients_text
+                elif allergen_source == "template" and template and template['sub_ingredients']:
                     default_sub_ingredients = template['sub_ingredients']
 
                 sub_ingredients = st.text_area(
@@ -322,7 +413,9 @@ def show_ingredients():
 
                 # May contain warnings
                 default_may_contain = ""
-                if template and template['may_contain']:
+                if allergen_source == "scanned" and scanned_traces:
+                    default_may_contain = ", ".join(scanned_traces)
+                elif allergen_source == "template" and template and template['may_contain']:
                     default_may_contain = ", ".join(template['may_contain'])
 
                 may_contain = st.text_input(
@@ -388,6 +481,10 @@ def show_ingredients():
 
                             session.add(new_ingredient)
                             session.commit()
+
+                            # Clear scanned product from session state
+                            if 'scanned_product' in st.session_state:
+                                del st.session_state['scanned_product']
 
                             if auto_template and (not allergen_selections and not sub_ingredients):
                                 st.success(f"✅ Added '{name}' with auto-filled allergen data from template!")
