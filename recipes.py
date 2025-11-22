@@ -165,13 +165,9 @@ def show_recipes():
                                         quantity = st.number_input("Quantity", min_value=0.01, step=0.1, value=1.0)
 
                                     with col_unit:
-                                        st.text_input(
-                                            "Unit",
-                                            value=selected_ingredient.unit,
-                                            disabled=True,
-                                            key=f"edit_recipe_unit_{recipe.id}",
-                                            help=f"Measured in {selected_ingredient.unit}"
-                                        )
+                                        # Show unit clearly - not greyed out!
+                                        st.markdown(f"**Unit:** {selected_ingredient.unit}")
+                                        st.caption(f"Measured in {selected_ingredient.unit}")
 
                                     if st.form_submit_button("➕ Add to Recipe"):
                                         existing_item = session.query(RecipeItem).filter_by(
@@ -311,13 +307,9 @@ def show_recipes():
                                         )
 
                                     with col_unit:
-                                        st.text_input(
-                                            "Unit",
-                                            value=selected_ing.unit,
-                                            disabled=True,
-                                            key=f"sales_recipe_unit_{i}",
-                                            help=f"This ingredient is measured in {selected_ing.unit}"
-                                        )
+                                        # Show unit clearly - not greyed out!
+                                        st.markdown(f"**Unit:** {selected_ing.unit}")
+                                        st.caption(f"Measured in {selected_ing.unit}")
 
                                     ingredient_selections.append({'id': ingredient_id, 'quantity': quantity})
 
@@ -475,13 +467,9 @@ def show_recipes():
                             )
 
                         with col_unit:
-                            st.text_input(
-                                "Unit",
-                                value=selected_ing.unit,
-                                disabled=True,
-                                key=f"new_recipe_unit_{i}",
-                                help=f"This ingredient is measured in {selected_ing.unit}"
-                            )
+                            # Show unit clearly - not greyed out!
+                            st.markdown(f"**Unit:** {selected_ing.unit}")
+                            st.caption(f"Measured in {selected_ing.unit}")
 
                         ingredient_selections.append({'id': ingredient_id, 'quantity': quantity})
 
