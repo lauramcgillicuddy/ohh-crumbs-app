@@ -10,7 +10,10 @@ def format_currency(amount):
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
 def auto_sync_square_sales(days_back=30):
-    """Automatically sync sales data from Square on app startup (cached for 1 hour)"""
+    """
+    Automatically sync sales data from Square on app startup (cached for 1 hour)
+    Also automatically deducts ingredients from inventory when new sales are imported
+    """
     try:
         from square_api import SquareAPI
         from database import get_session, close_session
@@ -30,6 +33,7 @@ def auto_sync_square_sales(days_back=30):
                 return None
 
             imported = 0
+            new_sales = []  # Track new sales for inventory deduction
 
             for order in orders:
                 try:
@@ -50,15 +54,26 @@ def auto_sync_square_sales(days_back=30):
                         )
                         session.add(new_sale)
                         imported += 1
+                        new_sales.append({
+                            'item_name': order['item_name'],
+                            'quantity': order['quantity'],
+                            'timestamp': new_sale.timestamp
+                        })
                 except Exception:
                     continue  # Skip failed orders silently
 
             session.commit()
 
+            # Automatically deduct ingredients for new sales
+            ingredients_deducted = 0
+            if new_sales:
+                ingredients_deducted = _deduct_ingredients_for_sales(session, new_sales)
+
             return {
                 'imported': imported,
                 'total_orders': len(orders),
-                'synced_at': datetime.utcnow()
+                'synced_at': datetime.utcnow(),
+                'ingredients_deducted': ingredients_deducted
             }
 
         finally:
@@ -67,6 +82,71 @@ def auto_sync_square_sales(days_back=30):
     except Exception:
         # Fail silently - don't break the app if Square sync fails
         return None
+
+
+def _deduct_ingredients_for_sales(session, sales):
+    """
+    Internal helper function to deduct ingredients from inventory based on sales
+    Returns the number of ingredients deducted
+    """
+    try:
+        from models import Recipe, RecipeItem, Ingredient, DailyUsage
+
+        # Group sales by item name
+        item_quantities = {}
+        for sale in sales:
+            item_name = sale['item_name']
+            quantity = sale['quantity']
+
+            if item_name in item_quantities:
+                item_quantities[item_name] += quantity
+            else:
+                item_quantities[item_name] = quantity
+
+        ingredients_updated = 0
+
+        # Process each item and deduct ingredients
+        for item_name, total_quantity in item_quantities.items():
+            # Find recipe matching this item name
+            recipe = session.query(Recipe).filter(
+                Recipe.name.ilike(f'%{item_name}%')
+            ).first()
+
+            if recipe and recipe.recipe_items:
+                # Deduct ingredients for each unit sold
+                for recipe_item in recipe.recipe_items:
+                    ingredient = recipe_item.ingredient
+                    quantity_needed = recipe_item.quantity * total_quantity
+
+                    # Update stock
+                    ingredient.current_stock = max(0, ingredient.current_stock - quantity_needed)
+
+                    # Record daily usage
+                    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                    daily_usage = session.query(DailyUsage).filter(
+                        DailyUsage.ingredient_id == ingredient.id,
+                        DailyUsage.date == today
+                    ).first()
+
+                    if daily_usage:
+                        daily_usage.quantity_used += quantity_needed
+                    else:
+                        daily_usage = DailyUsage(
+                            ingredient_id=ingredient.id,
+                            date=today,
+                            quantity_used=quantity_needed
+                        )
+                        session.add(daily_usage)
+
+                    ingredients_updated += 1
+
+        session.commit()
+        return ingredients_updated
+
+    except Exception:
+        # Don't break the sync if ingredient deduction fails
+        session.rollback()
+        return 0
 
 def calculate_recipe_cost(session, recipe_id):
     recipe = session.query(Recipe).filter_by(id=recipe_id).first()
