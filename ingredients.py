@@ -253,37 +253,53 @@ def show_ingredients():
 
             scanned_product = None
             if scanner_available:
-                scan_mode = st.radio("Product lookup:", ["⌨️ Manual Entry", "📷 Scan Barcode"], horizontal=True, key="product_scan_mode")
+                scan_mode = st.radio("Product lookup:", ["⌨️ Manual Entry", "📷 Scan Barcode", "🔢 Type Barcode Number"], horizontal=True, key="product_scan_mode")
+
+                barcode = None
 
                 if scan_mode == "📷 Scan Barcode":
                     st.caption("📷 Point your camera at the product barcode. Allow camera access if prompted.")
                     try:
                         barcode = qrcode_scanner(key='product_barcode_scanner')
-                        if barcode:
-                            st.info(f"Scanned barcode: {barcode}")
-                            with st.spinner("Looking up product..."):
-                                product_data = lookup_product_by_barcode(barcode)
-
-                                if product_data.get('found'):
-                                    st.success(f"✅ Found: **{product_data['name']}** ({product_data['brand']})")
-
-                                    # Store in session state
-                                    st.session_state['scanned_product'] = product_data
-
-                                    if product_data.get('image_url'):
-                                        col_img, col_info = st.columns([1, 2])
-                                        with col_img:
-                                            st.image(product_data['image_url'], width=150)
-                                        with col_info:
-                                            if product_data['allergens']:
-                                                st.write(f"**Allergens:** {', '.join(product_data['allergens'])}")
-                                            if product_data['traces']:
-                                                st.write(f"**May contain:** {', '.join(product_data['traces'])}")
-                                else:
-                                    st.warning(f"Product not found in database for barcode: {barcode}")
                     except Exception as e:
                         st.error(f"Scanner error: {str(e)}")
-                        st.info("Try manual entry instead!")
+                        st.info("Try 'Type Barcode Number' option instead!")
+
+                elif scan_mode == "🔢 Type Barcode Number":
+                    st.caption("🔢 Type or paste the barcode number from the product packaging")
+                    barcode_input = st.text_input("Barcode number:", placeholder="e.g., 5000169000250", key="manual_barcode_input")
+                    if st.button("🔍 Look Up Product", key="lookup_barcode"):
+                        barcode = barcode_input
+
+                # Process barcode lookup
+                if barcode:
+                    st.info(f"Looking up barcode: {barcode}")
+                    with st.spinner("Searching product database..."):
+                        product_data = lookup_product_by_barcode(barcode)
+
+                        if product_data.get('found'):
+                            st.success(f"✅ Found: **{product_data['name']}** ({product_data['brand']})")
+
+                            # Store in session state
+                            st.session_state['scanned_product'] = product_data
+
+                            if product_data.get('image_url'):
+                                col_img, col_info = st.columns([1, 2])
+                                with col_img:
+                                    st.image(product_data['image_url'], width=150)
+                                with col_info:
+                                    if product_data['allergens']:
+                                        st.write(f"**Allergens:** {', '.join(product_data['allergens'])}")
+                                    if product_data['traces']:
+                                        st.write(f"**May contain:** {', '.join(product_data['traces'])}")
+                                    if product_data.get('ingredients_text'):
+                                        st.write(f"**Ingredients:** {product_data['ingredients_text'][:100]}...")
+                        else:
+                            st.warning(f"❌ Product not found in Open Food Facts database")
+                            st.info("💡 **This product isn't in the database yet.** You can:")
+                            st.write("1. Fill in the allergen info manually below (use the template suggestions)")
+                            st.write("2. Or add this product to Open Food Facts at: https://world.openfoodfacts.org")
+                            st.write(f"   (Barcode: `{barcode}`)")
             else:
                 st.caption("🔍 Barcode scanner not available. Fill in ingredient details manually below.")
 
