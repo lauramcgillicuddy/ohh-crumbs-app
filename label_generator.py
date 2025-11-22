@@ -12,7 +12,7 @@ def generate_natasha_label(recipe, business_info=None):
     """
     Generate a Natasha's Law compliant label for a recipe
 
-    Returns: Dictionary with label components
+    Returns: Dictionary with label components and validation warnings
     """
 
     # Default business info
@@ -25,9 +25,14 @@ def generate_natasha_label(recipe, business_info=None):
 
     # Collect all ingredients with sub-ingredients
     ingredients_list = []
+    missing_allergen_info = []  # Track ingredients without allergen data
 
     for recipe_item in sorted(recipe.recipe_items, key=lambda x: x.quantity, reverse=True):
         ingredient = recipe_item.ingredient
+
+        # Check if allergen info is missing
+        if not ingredient.allergens and not ingredient.sub_ingredients:
+            missing_allergen_info.append(ingredient.name)
 
         # Get ingredient name
         ingredient_text = ingredient.name
@@ -76,7 +81,9 @@ def generate_natasha_label(recipe, business_info=None):
         "storage": storage,
         "use_by": use_by_text,
         "business": business_info,
-        "generated_date": datetime.now().strftime("%d/%m/%Y %H:%M")
+        "generated_date": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "missing_allergen_info": missing_allergen_info,  # List of ingredients without allergen data
+        "is_complete": len(missing_allergen_info) == 0  # Flag for complete allergen data
     }
 
     return label
