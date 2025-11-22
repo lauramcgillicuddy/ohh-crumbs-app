@@ -17,9 +17,14 @@ def show_dashboard():
     render_page_header("🧁 Ohh Crumbs", "CAKE AND CRUMBLE")
 
     # Auto-sync Square sales data (runs once per hour due to cache)
+    # This also automatically deducts ingredients from inventory!
     sync_result = auto_sync_square_sales(days_back=30)
     if sync_result and sync_result.get('imported', 0) > 0:
-        st.toast(f"✅ Synced {sync_result['imported']} new sales from Square", icon="🔄")
+        ingredients_deducted = sync_result.get('ingredients_deducted', 0)
+        if ingredients_deducted > 0:
+            st.toast(f"✅ Synced {sync_result['imported']} sales & updated {ingredients_deducted} ingredients", icon="🔄")
+        else:
+            st.toast(f"✅ Synced {sync_result['imported']} new sales from Square", icon="🔄")
 
     session = get_session()
 
