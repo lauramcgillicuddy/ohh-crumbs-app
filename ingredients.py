@@ -127,6 +127,18 @@ def show_ingredients():
                                 if suggestion and (not ingredient.allergens and not ingredient.sub_ingredients):
                                     st.info(suggestion)
 
+                                    # Add auto-fill button
+                                    if st.button(f"✨ Auto-Fill Allergen Data for {ingredient.name}", key=f"autofill_{ingredient.id}"):
+                                        auto_template = get_allergen_template(ingredient.name)
+                                        if auto_template:
+                                            ingredient.allergens = json.dumps(auto_template['allergens']) if auto_template['allergens'] else None
+                                            ingredient.sub_ingredients = auto_template['sub_ingredients'] if auto_template['sub_ingredients'] else None
+                                            if auto_template['may_contain']:
+                                                ingredient.may_contain = json.dumps(auto_template['may_contain'])
+                                            session.commit()
+                                            st.success(f"✅ Auto-filled allergen data for {ingredient.name}!")
+                                            st.rerun()
+
                                 # Get existing allergens
                                 existing_allergens = []
                                 if ingredient.allergens:
@@ -327,24 +339,38 @@ def show_ingredients():
                         st.error("Please fill in all required fields (marked with *)")
                     else:
                         existing = session.query(Ingredient).filter_by(name=name).first()
-                        
+
                         if existing:
                             st.error(f"Ingredient '{name}' already exists!")
                         else:
                             supplier_id = None
                             supplier_name = None
                             supplier_lead_time = lead_time
-                            
+
                             if selected_supplier != "None":
                                 supplier_obj = session.query(Supplier).filter(Supplier.name == selected_supplier).first()
                                 if supplier_obj:
                                     supplier_id = supplier_obj.id
                                     supplier_name = supplier_obj.name
                                     supplier_lead_time = supplier_obj.lead_time_days
-                            
+
+                            # Auto-fill from template if no allergen data was entered
+                            final_allergen_selections = allergen_selections
+                            final_sub_ingredients = sub_ingredients
+                            final_may_contain = may_contain
+
+                            # If user didn't fill anything in, try to auto-fill from template
+                            if not allergen_selections and not sub_ingredients:
+                                auto_template = get_allergen_template(name)
+                                if auto_template:
+                                    final_allergen_selections = auto_template['allergens']
+                                    final_sub_ingredients = auto_template['sub_ingredients']
+                                    if auto_template['may_contain'] and not may_contain:
+                                        final_may_contain = ", ".join(auto_template['may_contain'])
+
                             # Prepare allergen data
-                            allergens_json = json.dumps(allergen_selections) if allergen_selections else None
-                            may_contain_list = [m.strip() for m in may_contain.split(',') if m.strip()]
+                            allergens_json = json.dumps(final_allergen_selections) if final_allergen_selections else None
+                            may_contain_list = [m.strip() for m in final_may_contain.split(',') if m.strip()]
                             may_contain_json = json.dumps(may_contain_list) if may_contain_list else None
 
                             new_ingredient = Ingredient(
@@ -356,13 +382,17 @@ def show_ingredients():
                                 supplier=supplier_name,
                                 supplier_lead_time_days=supplier_lead_time,
                                 allergens=allergens_json,
-                                sub_ingredients=sub_ingredients if sub_ingredients else None,
+                                sub_ingredients=final_sub_ingredients if final_sub_ingredients else None,
                                 may_contain=may_contain_json
                             )
 
                             session.add(new_ingredient)
                             session.commit()
-                            st.success(f"✅ Added '{name}' to ingredients!")
+
+                            if auto_template and (not allergen_selections and not sub_ingredients):
+                                st.success(f"✅ Added '{name}' with auto-filled allergen data from template!")
+                            else:
+                                st.success(f"✅ Added '{name}' to ingredients!")
                             st.rerun()
         
         with tab3:
@@ -544,6 +574,36 @@ def show_ingredients():
             if not ingredients:
                 st.warning("No ingredients found. Add ingredients first!")
             else:
+                # Check how many can be auto-filled
+                auto_fillable = []
+                for ing in ingredients:
+                    if not (ing.allergens or ing.sub_ingredients):
+                        template = get_allergen_template(ing.name)
+                        if template:
+                            auto_fillable.append((ing, template))
+
+                # Show Quick Fill button if there are auto-fillable ingredients
+                if auto_fillable:
+                    st.markdown("---")
+                    col_btn1, col_btn2 = st.columns([1, 3])
+                    with col_btn1:
+                        if st.button(f"✨ Quick Fill All ({len(auto_fillable)} ingredients)", type="primary"):
+                            filled_count = 0
+                            for ing, template in auto_fillable:
+                                ing.allergens = json.dumps(template['allergens']) if template['allergens'] else None
+                                ing.sub_ingredients = template['sub_ingredients'] if template['sub_ingredients'] else None
+                                if template['may_contain']:
+                                    ing.may_contain = json.dumps(template['may_contain'])
+                                filled_count += 1
+
+                            session.commit()
+                            st.success(f"🎉 Auto-filled allergen data for {filled_count} ingredients!")
+                            st.rerun()
+
+                    with col_btn2:
+                        st.caption("Automatically fill allergen data for all ingredients with known templates (flour, butter, eggs, etc.)")
+
+                    st.markdown("---")
                 # Categorize ingredients
                 complete_ingredients = []
                 incomplete_ingredients = []
