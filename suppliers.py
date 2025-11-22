@@ -14,7 +14,7 @@ def show_suppliers():
     session = get_session()
     
     try:
-        tab1, tab2, tab3 = st.tabs(["📋 Suppliers", "📝 Orders", "➕ Add Supplier"])
+        tab1, tab2, tab3, tab4 = st.tabs(["📋 Suppliers", "📝 Orders", "📦 Create Order", "➕ Add Supplier"])
         
         with tab1:
             st.subheader("Active Suppliers")
@@ -199,9 +199,245 @@ def show_suppliers():
                                     st.success("Order cancelled")
                                     st.rerun()
             else:
-                st.info("📭 No orders yet. Create orders from the Inventory Alerts page.")
-        
+                st.info("📭 No orders yet. Create a new order in the 'Create Order' tab!")
+
         with tab3:
+            st.subheader("📦 Create New Supplier Order")
+            st.info("💡 Create a purchase order for ingredients. When it arrives, mark it as delivered to automatically update inventory!")
+
+            # Select supplier
+            suppliers = session.query(Supplier).order_by(Supplier.name).all()
+
+            if not suppliers:
+                st.warning("⚠️ No suppliers available. Please add a supplier first in the 'Add Supplier' tab.")
+            else:
+                supplier_options = {s.name: s for s in suppliers}
+                selected_supplier_name = st.selectbox(
+                    "Select Supplier *",
+                    options=list(supplier_options.keys()),
+                    help="Choose the supplier you're ordering from"
+                )
+
+                selected_supplier = supplier_options[selected_supplier_name]
+
+                st.write(f"**Lead Time:** {selected_supplier.lead_time_days} days")
+
+                st.markdown("---")
+                st.markdown("### 📝 Order Details")
+
+                # Order dates
+                col_date1, col_date2 = st.columns(2)
+
+                with col_date1:
+                    order_date = st.date_input(
+                        "Order Date",
+                        value=datetime.now().date(),
+                        help="Date you're placing this order"
+                    )
+
+                with col_date2:
+                    expected_delivery = order_date + timedelta(days=selected_supplier.lead_time_days)
+                    expected_delivery_date = st.date_input(
+                        "Expected Delivery Date",
+                        value=expected_delivery,
+                        help="When you expect to receive this order"
+                    )
+
+                order_notes = st.text_area(
+                    "Order Notes (optional)",
+                    placeholder="e.g., Spoke with John, confirmed delivery time, etc."
+                )
+
+                st.markdown("---")
+                st.markdown("### 🛒 Order Items")
+
+                # Get ingredients from this supplier (or all ingredients)
+                supplier_ingredients = session.query(Ingredient).filter(
+                    Ingredient.supplier_id == selected_supplier.id
+                ).order_by(Ingredient.name).all()
+
+                # If supplier has no assigned ingredients, show all ingredients
+                if not supplier_ingredients:
+                    st.info(f"💡 No ingredients are assigned to {selected_supplier.name} yet. Showing all ingredients.")
+                    supplier_ingredients = session.query(Ingredient).order_by(Ingredient.name).all()
+
+                if not supplier_ingredients:
+                    st.warning("⚠️ No ingredients in the system. Please add ingredients first!")
+                else:
+                    # Initialize order items in session state
+                    if 'order_items' not in st.session_state:
+                        st.session_state['order_items'] = []
+
+                    # Add item section
+                    with st.expander("➕ Add Items to Order", expanded=True):
+                        col_ing, col_qty, col_add = st.columns([3, 2, 1])
+
+                        with col_ing:
+                            ingredient_options = {f"{ing.name} ({ing.unit})": ing for ing in supplier_ingredients}
+                            selected_ingredient_name = st.selectbox(
+                                "Ingredient",
+                                options=list(ingredient_options.keys()),
+                                key="new_order_item_ingredient"
+                            )
+                            selected_ingredient = ingredient_options[selected_ingredient_name]
+
+                        with col_qty:
+                            quantity = st.number_input(
+                                f"Quantity ({selected_ingredient.unit})",
+                                min_value=0.1,
+                                value=1.0,
+                                step=0.1,
+                                key="new_order_item_quantity"
+                            )
+
+                        with col_add:
+                            st.write("")  # Spacing
+                            st.write("")  # Spacing
+                            if st.button("➕ Add Item", use_container_width=True):
+                                # Check if item already in order
+                                existing_item = next(
+                                    (item for item in st.session_state['order_items']
+                                     if item['ingredient_id'] == selected_ingredient.id),
+                                    None
+                                )
+
+                                if existing_item:
+                                    # Update quantity
+                                    existing_item['quantity'] += quantity
+                                    st.success(f"Updated quantity for {selected_ingredient.name}")
+                                else:
+                                    # Add new item
+                                    st.session_state['order_items'].append({
+                                        'ingredient_id': selected_ingredient.id,
+                                        'ingredient_name': selected_ingredient.name,
+                                        'unit': selected_ingredient.unit,
+                                        'quantity': quantity,
+                                        'unit_cost': selected_ingredient.cost_per_unit,
+                                        'total_cost': quantity * selected_ingredient.cost_per_unit
+                                    })
+                                    st.success(f"Added {selected_ingredient.name} to order")
+                                st.rerun()
+
+                    # Display current order items
+                    if st.session_state['order_items']:
+                        st.markdown("### 📋 Current Order")
+
+                        order_total = 0.0
+                        items_to_remove = []
+
+                        for idx, item in enumerate(st.session_state['order_items']):
+                            col_item, col_qty, col_cost, col_remove = st.columns([3, 2, 2, 1])
+
+                            with col_item:
+                                st.write(f"**{item['ingredient_name']}**")
+
+                            with col_qty:
+                                st.write(f"{item['quantity']} {item['unit']}")
+
+                            with col_cost:
+                                st.write(f"£{item['total_cost']:.2f}")
+                                order_total += item['total_cost']
+
+                            with col_remove:
+                                if st.button("🗑️", key=f"remove_item_{idx}"):
+                                    items_to_remove.append(idx)
+
+                        # Remove items marked for deletion
+                        for idx in sorted(items_to_remove, reverse=True):
+                            st.session_state['order_items'].pop(idx)
+                            st.rerun()
+
+                        st.markdown("---")
+                        st.markdown(f"### **Total Order Value: £{order_total:.2f}**")
+                        st.markdown("---")
+
+                        # Save order buttons
+                        col_save1, col_save2, col_cancel = st.columns(3)
+
+                        with col_save1:
+                            if st.button("💾 Save as Pending", type="primary", use_container_width=True):
+                                try:
+                                    # Create order
+                                    new_order = SupplierOrder(
+                                        supplier_id=selected_supplier.id,
+                                        order_date=datetime.combine(order_date, datetime.min.time()),
+                                        expected_delivery_date=datetime.combine(expected_delivery_date, datetime.min.time()),
+                                        status='pending',
+                                        total_cost=order_total,
+                                        notes=order_notes if order_notes else None
+                                    )
+                                    session.add(new_order)
+                                    session.flush()
+
+                                    # Add order items
+                                    for item in st.session_state['order_items']:
+                                        order_item = SupplierOrderItem(
+                                            order_id=new_order.id,
+                                            ingredient_id=item['ingredient_id'],
+                                            quantity=item['quantity'],
+                                            unit_cost=item['unit_cost'],
+                                            total_cost=item['total_cost']
+                                        )
+                                        session.add(order_item)
+
+                                    session.commit()
+                                    st.success(f"✅ Order #{new_order.id} saved as PENDING!")
+                                    st.info("💡 Go to the 'Orders' tab to mark it as delivered when it arrives.")
+
+                                    # Clear order items
+                                    st.session_state['order_items'] = []
+                                    st.rerun()
+
+                                except Exception as e:
+                                    session.rollback()
+                                    st.error(f"Error saving order: {str(e)}")
+
+                        with col_save2:
+                            if st.button("📤 Save as Ordered", type="secondary", use_container_width=True):
+                                try:
+                                    # Create order
+                                    new_order = SupplierOrder(
+                                        supplier_id=selected_supplier.id,
+                                        order_date=datetime.combine(order_date, datetime.min.time()),
+                                        expected_delivery_date=datetime.combine(expected_delivery_date, datetime.min.time()),
+                                        status='ordered',
+                                        total_cost=order_total,
+                                        notes=order_notes if order_notes else None
+                                    )
+                                    session.add(new_order)
+                                    session.flush()
+
+                                    # Add order items
+                                    for item in st.session_state['order_items']:
+                                        order_item = SupplierOrderItem(
+                                            order_id=new_order.id,
+                                            ingredient_id=item['ingredient_id'],
+                                            quantity=item['quantity'],
+                                            unit_cost=item['unit_cost'],
+                                            total_cost=item['total_cost']
+                                        )
+                                        session.add(order_item)
+
+                                    session.commit()
+                                    st.success(f"✅ Order #{new_order.id} saved as ORDERED!")
+                                    st.info("💡 Mark as delivered in the 'Orders' tab when it arrives to update inventory.")
+
+                                    # Clear order items
+                                    st.session_state['order_items'] = []
+                                    st.rerun()
+
+                                except Exception as e:
+                                    session.rollback()
+                                    st.error(f"Error saving order: {str(e)}")
+
+                        with col_cancel:
+                            if st.button("🗑️ Clear Order", use_container_width=True):
+                                st.session_state['order_items'] = []
+                                st.rerun()
+                    else:
+                        st.info("👆 Add items to your order using the form above")
+
+        with tab4:
             st.subheader("Add New Supplier")
 
             # Receipt upload section
