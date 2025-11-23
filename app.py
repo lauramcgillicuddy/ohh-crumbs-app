@@ -27,7 +27,6 @@ init_db()
 # --- Import your pages (top-level .py files) ---
 import dashboard, ingredients, inventory, inventory_alerts, profit_analysis, recipes, suppliers, square_setup, production_log
 import waste_tracking, equipment_maintenance, expiry_tracking, production_planner, cash_flow
-from pages import documentation
 
 st.sidebar.title("🍰 Ohh Crumbs")
 page = st.sidebar.radio(
@@ -46,8 +45,7 @@ page = st.sidebar.radio(
         "💸 Cash Flow Forecast",
         "🔧 Equipment Maintenance",
         "📦 Suppliers",
-        "🔗 Square Setup",
-        "📚 Documentation"
+        "🔗 Square Setup"
     ],
     label_visibility="collapsed",
 )
@@ -72,7 +70,6 @@ elif page.startswith("💸"): call(cash_flow, "show_cash_flow")
 elif page.startswith("🔧"): call(equipment_maintenance, "show_equipment_maintenance")
 elif page.startswith("📦"): call(suppliers, "show_suppliers")
 elif page.startswith("🔗"): call(square_setup, "show_square_setup")
-elif page.startswith("📚"): call(documentation, "show_documentation")
 
 st.sidebar.markdown("---")
 st.sidebar.caption("Add to Home Screen on iPhone for an app-like icon.")
