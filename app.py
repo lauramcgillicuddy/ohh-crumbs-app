@@ -3,23 +3,6 @@ import streamlit as st
 
 st.set_page_config(page_title="Ohh Crumbs", page_icon="🍰", layout="wide")
 
-# --- Simple optional password gate via Streamlit Secrets ---
-def gate():
-    want_auth = bool(st.secrets.get("ADMIN_PASSWORD", ""))
-    if not want_auth or st.session_state.get("ok"):
-        return True
-    with st.sidebar:
-        st.subheader("Login")
-        pw = st.text_input("Password", type="password")
-        if st.button("Enter"):
-            if pw == st.secrets["ADMIN_PASSWORD"]:
-                st.session_state.ok = True
-                st.rerun()
-            else:
-                st.error("Wrong password")
-    st.stop()
-gate()
-
 # --- Initialize database tables ---
 from database import init_db
 init_db()
