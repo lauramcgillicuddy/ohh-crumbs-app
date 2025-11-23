@@ -65,15 +65,21 @@ def show_suppliers():
 
                         with col_delete:
                             if st.button(f"🗑️ Delete", key=f"delete_{supplier.id}"):
-                                # Check if supplier has any orders
-                                order_count = session.query(SupplierOrder).filter(
-                                    SupplierOrder.supplier_id == supplier.id
-                                ).count()
+                                try:
+                                    # Rollback any pending changes first to avoid conflicts
+                                    session.rollback()
 
-                                if order_count > 0:
-                                    st.error(f"❌ Cannot delete {supplier.name} - they have {order_count} order(s) in the system. This is historical data that should be kept!")
-                                else:
-                                    try:
+                                    # Re-fetch the supplier after rollback
+                                    supplier = session.query(Supplier).get(supplier.id)
+
+                                    # Check if supplier has any orders
+                                    order_count = session.query(SupplierOrder).filter(
+                                        SupplierOrder.supplier_id == supplier.id
+                                    ).count()
+
+                                    if order_count > 0:
+                                        st.error(f"❌ Cannot delete {supplier.name} - they have {order_count} order(s) in the system. This is historical data that should be kept!")
+                                    else:
                                         # Unlink ingredients from this supplier
                                         session.query(Ingredient).filter(
                                             Ingredient.supplier_id == supplier.id
@@ -84,9 +90,9 @@ def show_suppliers():
                                         session.commit()
                                         st.success(f"✅ Deleted supplier: {supplier.name}")
                                         st.rerun()
-                                    except Exception as e:
-                                        session.rollback()
-                                        st.error(f"Error deleting supplier: {str(e)}")
+                                except Exception as e:
+                                    session.rollback()
+                                    st.error(f"Error deleting supplier: {str(e)}")
 
                         if st.session_state.get(f'editing_supplier_{supplier.id}'):
                             st.subheader(f"Edit {supplier.name}")
