@@ -17,7 +17,7 @@
 
 ## 🎯 Overview
 
-Ohh Crumbs is a comprehensive bakery management system built for **Emma's Ohh Crumbs Bakery**. It handles everything from inventory tracking to financial forecasting, helping you run your bakery more efficiently and profitably.
+Ohh Crumbs is a comprehensive bakery management system built for your bakery. It handles everything from inventory tracking to financial forecasting, helping you run your bakery more efficiently and profitably.
 
 ### What Can It Do?
 
@@ -597,5 +597,5 @@ You now have a professional-grade bakery management system that rivals commercia
 
 ---
 
-**Built with love for Emma's Ohh Crumbs Bakery** 🍰
+**Built with love for your bakery** 🍰
 *Transforming bakery operations, one feature at a time!*

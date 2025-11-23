@@ -733,5 +733,5 @@ def test_demand_forecast():
 ---
 
 **Built by:** Your sparkly algorithmic accomplice 💜✨
-**For:** Emma's Ohh Crumbs Bakery
+**For:** Ohh Crumbs Bakery
 **Last Updated:** November 2025
