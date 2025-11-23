@@ -248,6 +248,41 @@ def show_ingredients():
         with tab2:
             st.subheader("Add New Ingredient")
 
+            # Ingredient autocomplete search
+            st.markdown("### 🔍 Copy from Existing Ingredient")
+            st.info("💡 Start typing an ingredient name to auto-fill all details from an existing ingredient!")
+
+            # Get all existing ingredients for autocomplete
+            all_ingredients = session.query(Ingredient).order_by(Ingredient.name).all()
+            ingredient_options = ["➕ Create New Ingredient"] + [ing.name for ing in all_ingredients]
+
+            col_search, col_clear = st.columns([3, 1])
+
+            with col_search:
+                selected_ingredient_name = st.selectbox(
+                    "Search existing ingredients or create new",
+                    ingredient_options,
+                    key="ingredient_autocomplete",
+                    help="Type to search for existing ingredients, or select 'Create New' to start fresh"
+                )
+
+            with col_clear:
+                st.write("")  # Spacing
+                st.write("")  # Spacing
+                if st.button("🗑️ Clear", key="clear_ingredient_selection"):
+                    st.session_state['ingredient_autocomplete'] = "➕ Create New Ingredient"
+                    st.rerun()
+
+            # Store selected ingredient data in session state
+            prefill_data = None
+            if selected_ingredient_name != "➕ Create New Ingredient":
+                selected_ing = session.query(Ingredient).filter(Ingredient.name == selected_ingredient_name).first()
+                if selected_ing:
+                    st.success(f"✨ Copying details from **{selected_ing.name}**. Modify as needed and save to create a new ingredient!")
+                    prefill_data = selected_ing
+
+            st.markdown("---")
+
             # Barcode Scanner for Product Lookup
             st.markdown("### 📱 Scan Product Barcode (Optional)")
             st.info("💡 Scan a product barcode to auto-fill allergen information from the product packaging!")
@@ -420,9 +455,32 @@ Format: Return ONLY the ingredient text as it appears on the package, maintainin
                 st.markdown(BAKING_CONVERSIONS)
 
             with st.form("add_ingredient_form"):
-                # Pre-fill name from scanned product if available
+                # Pre-fill from selected ingredient, scanned product, or empty
                 default_name = ""
-                if scanned_product and scanned_product.get('found'):
+                default_unit = "kg"
+                default_cost = 0.0
+                default_stock = 0.0
+                default_supplier = "None"
+                default_lead_time = 7
+
+                # Priority 1: Prefill from selected existing ingredient
+                if prefill_data:
+                    default_name = prefill_data.name
+                    default_unit = prefill_data.unit if prefill_data.unit else "kg"
+                    default_cost = float(prefill_data.cost_per_unit)
+                    default_stock = 0.0  # Don't copy stock, start fresh
+                    default_lead_time = prefill_data.supplier_lead_time_days
+
+                    # Get supplier name
+                    if prefill_data.supplier_id:
+                        supplier_obj = session.query(Supplier).get(prefill_data.supplier_id)
+                        if supplier_obj:
+                            default_supplier = supplier_obj.name
+                    elif prefill_data.supplier:
+                        default_supplier = prefill_data.supplier
+
+                # Priority 2: Prefill from scanned product (if no ingredient selected)
+                elif scanned_product and scanned_product.get('found'):
                     product_name = scanned_product.get('name', '')
                     brand = scanned_product.get('brand', '')
                     default_name = f"{brand} {product_name}".strip() if brand else product_name
@@ -430,79 +488,102 @@ Format: Return ONLY the ingredient text as it appears on the package, maintainin
                 name = st.text_input("Ingredient Name *", value=default_name, placeholder="e.g., All-Purpose Flour")
 
                 col1, col2 = st.columns(2)
-                
+
                 with col1:
-                    unit = st.selectbox("Unit of Measurement *", 
-                        ["kg", "g", "lb", "oz", "L", "mL", "cups", "tbsp", "tsp", "units"])
-                
+                    available_units = ["kg", "g", "lb", "oz", "L", "mL", "cups", "tbsp", "tsp", "units"]
+                    default_unit_index = available_units.index(default_unit) if default_unit in available_units else 0
+                    unit = st.selectbox("Unit of Measurement *", available_units, index=default_unit_index)
+
                 with col2:
-                    cost_per_unit = st.number_input("Cost per Unit *", min_value=0.0, step=0.01, value=0.0)
-                
+                    cost_per_unit = st.number_input("Cost per Unit *", min_value=0.0, step=0.01, value=default_cost)
+
                 col3, col4 = st.columns(2)
-                
+
                 with col3:
-                    initial_stock = st.number_input("Initial Stock Quantity", min_value=0.0, step=0.1, value=0.0)
-                
+                    initial_stock = st.number_input("Initial Stock Quantity", min_value=0.0, step=0.1, value=default_stock)
+
                 with col4:
                     suppliers = session.query(Supplier).order_by(Supplier.name).all()
                     supplier_options = ["None"] + [s.name for s in suppliers]
-                    selected_supplier = st.selectbox("Supplier", supplier_options, 
+                    default_supplier_index = 0
+                    if default_supplier in supplier_options:
+                        default_supplier_index = supplier_options.index(default_supplier)
+                    selected_supplier = st.selectbox("Supplier", supplier_options, index=default_supplier_index,
                         help="Select from existing suppliers or choose 'None'")
-                
-                lead_time = st.number_input("Supplier Lead Time (days)", min_value=1, step=1, value=7,
+
+                lead_time = st.number_input("Supplier Lead Time (days)", min_value=1, step=1, value=default_lead_time,
                     help="How many days it takes to receive an order from this supplier (only used if no supplier selected)")
 
                 st.markdown("---")
                 st.markdown("### 🏷️ Natasha's Law - Allergen Information")
 
-                # Determine allergen source: scanned product or template
+                # Determine allergen source: prefilled ingredient, scanned product, or template
                 allergen_source = None
-                scanned_allergens = []
-                scanned_traces = []
-                scanned_ingredients_text = ""
+                default_allergens = []
+                default_traces = []
+                default_ingredients_text = ""
 
-                if scanned_product and scanned_product.get('found'):
-                    # Use scanned product data
+                # Priority 1: Prefill from selected existing ingredient
+                if prefill_data:
+                    allergen_source = "prefill"
+                    # Parse allergens from JSON
+                    if prefill_data.allergens:
+                        try:
+                            default_allergens = json.loads(prefill_data.allergens)
+                        except:
+                            default_allergens = []
+                    # Parse may_contain from JSON
+                    if prefill_data.may_contain:
+                        try:
+                            default_traces = json.loads(prefill_data.may_contain)
+                        except:
+                            default_traces = []
+                    # Get sub-ingredients
+                    if prefill_data.sub_ingredients:
+                        default_ingredients_text = prefill_data.sub_ingredients
+
+                    st.success(f"💡 **From Selected Ingredient:** Allergen data copied from '{prefill_data.name}'. Review and adjust if needed!")
+
+                # Priority 2: Use scanned product data
+                elif scanned_product and scanned_product.get('found'):
                     allergen_source = "scanned"
                     raw_allergens = scanned_product.get('allergens', [])
-                    scanned_allergens = map_to_natasha_allergens(raw_allergens)
+                    default_allergens = map_to_natasha_allergens(raw_allergens)
                     raw_traces = scanned_product.get('traces', [])
-                    scanned_traces = map_to_natasha_allergens(raw_traces)
-                    scanned_ingredients_text = scanned_product.get('ingredients_text', '')
+                    default_traces = map_to_natasha_allergens(raw_traces)
+                    default_ingredients_text = scanned_product.get('ingredients_text', '')
                     st.success(f"💡 **From Scanned Product:** Allergen data auto-filled from product packaging!")
+
+                # Priority 3: Check template
                 else:
-                    # Check if we have a template for this ingredient name
                     template = None
                     if name:
                         template = get_allergen_template(name)
                         if template:
                             allergen_source = "template"
+                            default_allergens = template['allergens']
+                            if template['may_contain']:
+                                default_traces = template['may_contain']
+                            if template['sub_ingredients']:
+                                default_ingredients_text = template['sub_ingredients']
                             st.success(f"💡 **Smart Suggestion:** Allergen data auto-filled for '{name}'. Review and adjust if needed!")
 
                 st.info("⚠️ **IMPORTANT:** Allergen information is required for Natasha's Law compliance in Northern Ireland. Review and adjust if needed!")
 
-                # Allergen selection (with scanned product or template defaults)
+                # Allergen selection (with defaults from prefill, scanned product, or template)
                 allergen_selections = []
                 for category, allergens in ALLERGEN_CATEGORIES.items():
                     if len(allergens) == 1:
-                        # Check if this allergen is in the scanned product or template
-                        default_checked = False
-                        if allergen_source == "scanned":
-                            default_checked = allergens[0] in scanned_allergens
-                        elif allergen_source == "template" and template:
-                            default_checked = allergens[0] in template['allergens']
+                        # Check if this allergen is in the defaults
+                        default_checked = allergens[0] in default_allergens
 
                         # Simple checkbox for single-item categories
                         if st.checkbox(f"Contains {category}", value=default_checked, key=f"allergen_{category}",
                                      help=f"Check if this ingredient contains {category}"):
                             allergen_selections.extend(allergens)
                     else:
-                        # Get default selections from scanned product or template
-                        default_selections = []
-                        if allergen_source == "scanned":
-                            default_selections = [a for a in allergens if a in scanned_allergens]
-                        elif allergen_source == "template" and template:
-                            default_selections = [a for a in allergens if a in template['allergens']]
+                        # Get default selections
+                        default_selections = [a for a in allergens if a in default_allergens]
 
                         # Multi-select for categories with multiple items
                         selected = st.multiselect(
@@ -515,29 +596,20 @@ Format: Return ONLY the ingredient text as it appears on the package, maintainin
                         allergen_selections.extend(selected)
 
                 # Sub-ingredients (for compound ingredients)
-                default_sub_ingredients = ""
-                if allergen_source == "scanned" and scanned_ingredients_text:
-                    default_sub_ingredients = scanned_ingredients_text
-                elif allergen_source == "template" and template and template['sub_ingredients']:
-                    default_sub_ingredients = template['sub_ingredients']
-                elif 'ocr_ingredients_text' in st.session_state:
-                    # Use OCR text if available
-                    default_sub_ingredients = st.session_state['ocr_ingredients_text']
+                # Check for OCR text if no other source
+                if not default_ingredients_text and 'ocr_ingredients_text' in st.session_state:
+                    default_ingredients_text = st.session_state['ocr_ingredients_text']
                     st.success("💡 **From Photo:** Ingredients text extracted from your uploaded photo!")
 
                 sub_ingredients = st.text_area(
                     "Sub-Ingredients (for compound ingredients)",
-                    value=default_sub_ingredients,
+                    value=default_ingredients_text,
                     placeholder="e.g., for 'Wheat Flour': Wheat, Calcium Carbonate, Iron, Niacin, Thiamin",
                     help="⚠️ IMPORTANT: If this ingredient is made of other ingredients, list them ALL here. This appears on the label!"
                 )
 
                 # May contain warnings
-                default_may_contain = ""
-                if allergen_source == "scanned" and scanned_traces:
-                    default_may_contain = ", ".join(scanned_traces)
-                elif allergen_source == "template" and template and template['may_contain']:
-                    default_may_contain = ", ".join(template['may_contain'])
+                default_may_contain = ", ".join(default_traces) if default_traces else ""
 
                 may_contain = st.text_input(
                     "May contain (cross-contamination warnings)",
