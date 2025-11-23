@@ -1,6 +1,6 @@
 import streamlit as st
 from database import get_session, close_session
-from models import Ingredient, Supplier
+from models import Ingredient, Supplier, RecipeItem, SupplierOrderItem
 from datetime import datetime
 from styling import inject_custom_css, render_page_header
 from unit_conversions import BAKING_CONVERSIONS
@@ -90,10 +90,29 @@ def show_ingredients():
                         
                         with col_edit2:
                             if st.button(f"🗑️ Delete", key=f"delete_{ingredient.id}"):
-                                session.delete(ingredient)
-                                session.commit()
-                                st.success(f"Deleted {ingredient.name}")
-                                st.rerun()
+                                # Check if ingredient is used in any recipes
+                                recipe_uses = session.query(RecipeItem).filter(
+                                    RecipeItem.ingredient_id == ingredient.id
+                                ).count()
+
+                                # Check if ingredient is in any supplier orders
+                                order_uses = session.query(SupplierOrderItem).filter(
+                                    SupplierOrderItem.ingredient_id == ingredient.id
+                                ).count()
+
+                                if recipe_uses > 0:
+                                    st.error(f"❌ Cannot delete {ingredient.name} - it's used in {recipe_uses} recipe(s). Remove it from recipes first!")
+                                elif order_uses > 0:
+                                    st.error(f"❌ Cannot delete {ingredient.name} - it's in {order_uses} supplier order(s). This is historical data that should be kept.")
+                                else:
+                                    try:
+                                        session.delete(ingredient)
+                                        session.commit()
+                                        st.success(f"✅ Deleted {ingredient.name}")
+                                        st.rerun()
+                                    except Exception as e:
+                                        session.rollback()
+                                        st.error(f"Error deleting ingredient: {str(e)}")
                         
                         if st.session_state.get(f'editing_{ingredient.id}', False):
                             with st.form(key=f"edit_form_{ingredient.id}"):

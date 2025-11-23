@@ -1,6 +1,6 @@
 import streamlit as st
 from database import get_session, close_session
-from models import Recipe, Ingredient, RecipeItem, SalesCache
+from models import Recipe, Ingredient, RecipeItem, SalesCache, ProductionBatch
 from utils import calculate_recipe_cost, calculate_profit_margin
 from styling import inject_custom_css, render_page_header
 from unit_conversions import BAKING_CONVERSIONS
@@ -208,10 +208,28 @@ def show_recipes():
                         
                         with col_delete:
                             if st.button(f"🗑️ Delete Recipe", key=f"delete_recipe_{recipe.id}"):
-                                session.delete(recipe)
-                                session.commit()
-                                st.success(f"Deleted recipe: {recipe.name}")
-                                st.rerun()
+                                # Check if recipe is used in any production batches
+                                production_uses = session.query(ProductionBatch).filter(
+                                    ProductionBatch.recipe_id == recipe.id
+                                ).count()
+
+                                if production_uses > 0:
+                                    st.error(f"❌ Cannot delete {recipe.name} - it's been used in {production_uses} production batch(es). This is historical data that should be kept!")
+                                else:
+                                    try:
+                                        # Delete recipe items first (they're part of the recipe)
+                                        session.query(RecipeItem).filter(
+                                            RecipeItem.recipe_id == recipe.id
+                                        ).delete()
+
+                                        # Then delete the recipe
+                                        session.delete(recipe)
+                                        session.commit()
+                                        st.success(f"✅ Deleted recipe: {recipe.name}")
+                                        st.rerun()
+                                    except Exception as e:
+                                        session.rollback()
+                                        st.error(f"Error deleting recipe: {str(e)}")
                         
                         if st.session_state.get(f'editing_recipe_{recipe.id}', False):
                             st.write("---")
