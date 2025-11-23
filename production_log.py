@@ -335,27 +335,36 @@ def show_production_log():
                                     st.write(f"{batch.quantity_produced:.1f} items")
 
                                 with col_delete:
-                                    if st.button("🗑️", key=f"delete_batch_{batch.id}", help="Delete this batch"):
-                                        try:
-                                            # Rollback any pending changes first
-                                            session.rollback()
+                                    delete_key = f'deleting_batch_{batch.id}'
 
-                                            # Re-fetch the batch after rollback
-                                            batch = session.query(ProductionBatch).get(batch.id)
+                                    if st.session_state.get(delete_key):
+                                        # Show confirmation inline
+                                        if st.button("✅ Delete", key=f"confirm_delete_batch_{batch.id}", help="Confirm deletion"):
+                                            try:
+                                                # Rollback any pending changes first
+                                                session.rollback()
 
-                                            # Warn about stock already being deducted
-                                            st.warning("⚠️ Stock was already deducted when this batch was created. Deleting will NOT restore ingredient stock!")
+                                                # Re-fetch the batch after rollback
+                                                batch = session.query(ProductionBatch).get(batch.id)
 
-                                            # Add confirmation
-                                            if st.button("⚠️ Yes, Delete", key=f"confirm_delete_batch_{batch.id}", type="primary"):
                                                 session.delete(batch)
                                                 session.commit()
+
+                                                # Clear the deletion flag
+                                                del st.session_state[delete_key]
+
                                                 st.success("✅ Batch deleted")
                                                 st.rerun()
+                                            except Exception as e:
+                                                session.rollback()
+                                                st.error(f"Error deleting batch: {str(e)}")
+                                    else:
+                                        if st.button("🗑️", key=f"delete_batch_{batch.id}", help="Delete this batch"):
+                                            st.session_state[delete_key] = True
+                                            st.rerun()
 
-                                        except Exception as e:
-                                            session.rollback()
-                                            st.error(f"Error deleting batch: {str(e)}")
+                                if st.session_state.get(f'deleting_batch_{batch.id}'):
+                                    st.warning("⚠️ Click ✅ to confirm. Stock deducted from this batch will NOT be restored!")
 
                                 st.markdown("---")
 

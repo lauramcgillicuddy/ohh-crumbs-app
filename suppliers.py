@@ -192,6 +192,8 @@ def show_suppliers():
 
                         st.markdown("---")
 
+                        st.markdown("---")
+
                         if order.status != 'delivered':
                             col_status1, col_status2 = st.columns(2)
 
@@ -217,20 +219,26 @@ def show_suppliers():
                                     st.rerun()
 
                         # Delete button (always available)
-                        if st.button("🗑️ Delete Order", key=f"delete_order_{order.id}", type="secondary"):
-                            try:
-                                # Rollback any pending changes first
-                                session.rollback()
+                        # Check if this order is marked for deletion
+                        delete_key = f'deleting_order_{order.id}'
 
-                                # Re-fetch the order after rollback
-                                order = session.query(SupplierOrder).get(order.id)
+                        if st.session_state.get(delete_key):
+                            # Show confirmation
+                            st.warning("⚠️ Are you sure you want to delete this order?")
+                            if order.status == 'delivered':
+                                st.warning("⚠️ This order was marked as delivered. Stock was already updated and will NOT be reversed!")
 
-                                # Warn if order was delivered (stock was already updated)
-                                if order.status == 'delivered':
-                                    st.warning("⚠️ This order was marked as delivered and stock was already updated. Deleting it will NOT reverse the stock changes!")
+                            col_conf1, col_conf2 = st.columns(2)
 
-                                    # Add confirmation
-                                    if st.button("⚠️ Yes, Delete Anyway", key=f"confirm_delete_order_{order.id}", type="primary"):
+                            with col_conf1:
+                                if st.button("✅ Yes, Delete", key=f"confirm_delete_{order.id}", type="primary"):
+                                    try:
+                                        # Rollback any pending changes first
+                                        session.rollback()
+
+                                        # Re-fetch the order after rollback
+                                        order = session.query(SupplierOrder).get(order.id)
+
                                         # Delete order items first
                                         session.query(SupplierOrderItem).filter(
                                             SupplierOrderItem.order_id == order.id
@@ -239,24 +247,25 @@ def show_suppliers():
                                         # Delete the order
                                         session.delete(order)
                                         session.commit()
+
+                                        # Clear the deletion flag
+                                        del st.session_state[delete_key]
+
                                         st.success("✅ Order deleted")
                                         st.rerun()
-                                else:
-                                    # Safe to delete - not delivered yet
-                                    # Delete order items first
-                                    session.query(SupplierOrderItem).filter(
-                                        SupplierOrderItem.order_id == order.id
-                                    ).delete()
+                                    except Exception as e:
+                                        session.rollback()
+                                        st.error(f"Error deleting order: {str(e)}")
 
-                                    # Delete the order
-                                    session.delete(order)
-                                    session.commit()
-                                    st.success("✅ Order deleted")
+                            with col_conf2:
+                                if st.button("❌ Cancel", key=f"cancel_delete_{order.id}"):
+                                    del st.session_state[delete_key]
                                     st.rerun()
-
-                            except Exception as e:
-                                session.rollback()
-                                st.error(f"Error deleting order: {str(e)}")
+                        else:
+                            # Show delete button
+                            if st.button("🗑️ Delete Order", key=f"delete_order_{order.id}", type="secondary"):
+                                st.session_state[delete_key] = True
+                                st.rerun()
             else:
                 st.info("📭 No orders yet. Create a new order in the 'Create Order' tab!")
 
