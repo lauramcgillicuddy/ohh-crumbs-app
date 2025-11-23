@@ -322,8 +322,80 @@ Return as JSON with this structure:
 
 def extract_text_from_image(image_bytes: bytes, filename: str = "") -> str:
     """
-    Extract text from image or PDF using pytesseract OCR with preprocessing.
+    Extract text from image or PDF using GPT Vision API (preferred) or pytesseract OCR fallback.
+
+    Priority:
+    1. Try GPT-4o-mini Vision API (best quality)
+    2. Fall back to pytesseract OCR if GPT not available
     """
+    import os
+
+    # FIRST: Try GPT Vision API (if API key available)
+    openai_key = os.getenv('OPENAI_API_KEY')
+
+    if openai_key:
+        try:
+            import base64
+            import requests
+
+            # Convert image to base64
+            base64_image = base64.b64encode(image_bytes).decode('utf-8')
+
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {openai_key}"
+            }
+
+            payload = {
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": """Extract ALL text from this image exactly as it appears.
+Include:
+- Product names and descriptions
+- Quantities and measurements
+- Prices and amounts
+- Dates, phone numbers, addresses
+- All numbers and codes
+- Ingredient lists
+- Recipe instructions
+
+Preserve the original layout and formatting as much as possible.
+Return only the extracted text, nothing else."""
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "max_tokens": 2000
+            }
+
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                extracted_text = response.json()['choices'][0]['message']['content']
+                return extracted_text
+            else:
+                st.warning(f"GPT Vision API returned status {response.status_code}. Falling back to pytesseract...")
+
+        except Exception as e:
+            st.warning(f"GPT Vision extraction failed ({str(e)}). Falling back to pytesseract...")
+
+    # FALLBACK: Use pytesseract OCR
     try:
         from PIL import Image, ImageEnhance, ImageFilter
         import io
@@ -351,7 +423,7 @@ def extract_text_from_image(image_bytes: bytes, filename: str = "") -> str:
                         ) + "\n"
                     return text
                 except ImportError:
-                    st.warning("pytesseract not available. Using basic text extraction.")
+                    st.warning("pytesseract not available and no OpenAI API key configured.")
                     return ""
             except ImportError:
                 st.error("pdf2image not installed. Cannot process PDF files. Please upload JPG/PNG instead.")
@@ -397,7 +469,7 @@ def extract_text_from_image(image_bytes: bytes, filename: str = "") -> str:
 
                     return text
                 except ImportError:
-                    st.warning("pytesseract not installed. OCR not available. Please add to Streamlit secrets: OPENAI_API_KEY for AI parsing.")
+                    st.warning("pytesseract not installed. Please add OPENAI_API_KEY to Streamlit secrets for AI-powered OCR.")
                     return ""
 
             except Exception as e:

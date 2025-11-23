@@ -326,29 +326,29 @@ def show_ingredients():
                             with st.spinner("🤖 Analyzing photo with AI..."):
                                 try:
                                     import base64
-                                    from openai import OpenAI
+                                    import requests
+                                    import os
 
-                                    # Get API key from secrets
-                                    if "OPENAI_API_KEY" not in st.secrets:
-                                        st.error("⚠️ OpenAI API key not found in secrets. Please add it to your Streamlit secrets.")
+                                    # Get API key from environment/secrets
+                                    openai_key = os.getenv('OPENAI_API_KEY') or st.secrets.get("OPENAI_API_KEY")
+
+                                    if not openai_key:
+                                        st.error("⚠️ OpenAI API key not found. Please add it to your Streamlit secrets.")
                                         st.info("Add `OPENAI_API_KEY = \"sk-...\"` to your `.streamlit/secrets.toml` file")
                                     else:
-                                        # Initialize OpenAI client
-                                        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
                                         # Convert image to base64
                                         uploaded_file.seek(0)  # Reset file pointer
                                         image_bytes = uploaded_file.read()
                                         base64_image = base64.b64encode(image_bytes).decode('utf-8')
 
-                                        # Determine image type
-                                        file_extension = uploaded_file.name.split('.')[-1].lower()
-                                        mime_type = f"image/{file_extension}" if file_extension in ['png', 'jpg', 'jpeg'] else "image/jpeg"
+                                        headers = {
+                                            "Content-Type": "application/json",
+                                            "Authorization": f"Bearer {openai_key}"
+                                        }
 
-                                        # Call GPT-4 Vision
-                                        response = client.chat.completions.create(
-                                            model="gpt-4o",
-                                            messages=[
+                                        payload = {
+                                            "model": "gpt-4o-mini",
+                                            "messages": [
                                                 {
                                                     "role": "user",
                                                     "content": [
@@ -367,33 +367,41 @@ Format: Return ONLY the ingredient text as it appears on the package, maintainin
                                                         {
                                                             "type": "image_url",
                                                             "image_url": {
-                                                                "url": f"data:{mime_type};base64,{base64_image}"
+                                                                "url": f"data:image/jpeg;base64,{base64_image}"
                                                             }
                                                         }
                                                     ]
                                                 }
                                             ],
-                                            max_tokens=1000
+                                            "max_tokens": 1000
+                                        }
+
+                                        response = requests.post(
+                                            "https://api.openai.com/v1/chat/completions",
+                                            headers=headers,
+                                            json=payload,
+                                            timeout=30
                                         )
 
-                                        extracted_text = response.choices[0].message.content.strip()
+                                        if response.status_code == 200:
+                                            extracted_text = response.json()['choices'][0]['message']['content'].strip()
 
-                                        if extracted_text:
-                                            st.success("✅ Successfully extracted ingredients using AI!")
+                                            if extracted_text:
+                                                st.success("✅ Successfully extracted ingredients using GPT-4o-mini!")
 
-                                            # Store extracted text in session state
-                                            st.session_state['ocr_ingredients_text'] = extracted_text
+                                                # Store extracted text in session state
+                                                st.session_state['ocr_ingredients_text'] = extracted_text
 
-                                            # Display extracted text
-                                            st.text_area("Extracted Ingredients:", value=extracted_text, height=200, key="ocr_display")
+                                                # Display extracted text
+                                                st.text_area("Extracted Ingredients:", value=extracted_text, height=200, key="ocr_display")
 
-                                            st.info("💡 **Review the text above and use it to fill in the ingredient details below!**")
+                                                st.info("💡 **Review the text above and use it to fill in the ingredient details below!**")
+                                            else:
+                                                st.warning("❌ Could not extract text from image. Try a clearer photo!")
                                         else:
-                                            st.warning("❌ Could not extract text from image. Try a clearer photo!")
+                                            st.error(f"API request failed with status {response.status_code}")
+                                            st.error(f"Response: {response.text}")
 
-                                except ImportError as e:
-                                    st.error(f"Missing required library: {str(e)}")
-                                    st.info("Install with: `pip install openai`")
                                 except Exception as e:
                                     st.error(f"OCR error: {str(e)}")
                                     st.info("Make sure your OpenAI API key is valid and you have credits available!")
