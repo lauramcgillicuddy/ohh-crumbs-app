@@ -189,5 +189,101 @@ class ProductionBatch(Base):
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Batch costing comparison
+    expected_cost = Column(Float, default=0.0)
+    actual_cost = Column(Float, default=0.0)
+
     def __repr__(self):
         return f"<ProductionBatch(id={self.id}, recipe_id={self.recipe_id}, quantity={self.quantity_produced})>"
+
+
+class WastageLog(Base):
+    __tablename__ = 'wastage_log'
+
+    id = Column(Integer, primary_key=True)
+    ingredient_id = Column(Integer, ForeignKey('ingredients.id'))
+    recipe_id = Column(Integer, ForeignKey('recipes.id'))
+    quantity = Column(Float, nullable=False)
+    unit = Column(String(50))
+    reason = Column(String(200))  # 'burnt', 'expired', 'dropped', 'spoiled', 'customer_complaint', 'other'
+    cost = Column(Float, default=0.0)
+    wastage_date = Column(DateTime, default=datetime.utcnow)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<WastageLog(id={self.id}, reason='{self.reason}', cost={self.cost})>"
+
+
+class IngredientBatch(Base):
+    __tablename__ = 'ingredient_batches'
+
+    id = Column(Integer, primary_key=True)
+    ingredient_id = Column(Integer, ForeignKey('ingredients.id'), nullable=False)
+    quantity = Column(Float, nullable=False)
+    unit = Column(String(50), nullable=False)
+    cost_per_unit = Column(Float, default=0.0)
+    received_date = Column(DateTime, default=datetime.utcnow)
+    expiry_date = Column(DateTime)
+    batch_number = Column(String(100))
+    supplier_order_id = Column(Integer, ForeignKey('supplier_orders.id'))
+    quantity_remaining = Column(Float)  # Tracks FIFO usage
+    is_active = Column(Boolean, default=True)  # False when fully used
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<IngredientBatch(id={self.id}, ingredient_id={self.ingredient_id}, expiry={self.expiry_date})>"
+
+
+class ProductionPlan(Base):
+    __tablename__ = 'production_plans'
+
+    id = Column(Integer, primary_key=True)
+    recipe_id = Column(Integer, ForeignKey('recipes.id'), nullable=False)
+    planned_date = Column(DateTime, nullable=False)
+    planned_quantity = Column(Float, nullable=False)
+    forecasted_demand = Column(Float)  # AI prediction
+    confidence_score = Column(Float)  # 0-100% confidence in forecast
+    status = Column(String(50), default='planned')  # 'planned', 'in_progress', 'completed', 'cancelled'
+    actual_quantity = Column(Float)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<ProductionPlan(id={self.id}, recipe_id={self.recipe_id}, date={self.planned_date})>"
+
+
+class EquipmentLog(Base):
+    __tablename__ = 'equipment_log'
+
+    id = Column(Integer, primary_key=True)
+    equipment_name = Column(String(200), nullable=False)
+    equipment_type = Column(String(100))  # 'oven', 'mixer', 'refrigerator', 'freezer', 'other'
+    maintenance_type = Column(String(100))  # 'cleaning', 'repair', 'calibration', 'inspection', 'replacement'
+    maintenance_date = Column(DateTime, default=datetime.utcnow)
+    next_maintenance_date = Column(DateTime)
+    cost = Column(Float, default=0.0)
+    performed_by = Column(String(200))
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<EquipmentLog(id={self.id}, equipment='{self.equipment_name}', type='{self.maintenance_type}')>"
+
+
+class UserRole(Base):
+    __tablename__ = 'user_roles'
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String(100), unique=True, nullable=False)
+    display_name = Column(String(200))
+    role = Column(String(50), default='staff')  # 'admin', 'manager', 'staff', 'viewer'
+    password_hash = Column(String(200))  # Simple hash for basic auth
+    email = Column(String(200))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime)
+
+    def __repr__(self):
+        return f"<UserRole(username='{self.username}', role='{self.role}')>"
