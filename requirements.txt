@@ -11,3 +11,5 @@ streamlit-qrcode-scanner
 Pillow
 openai
 pdf2image
+markdown
+weasyprint
