@@ -329,32 +329,48 @@ def extract_text_from_image(image_bytes: bytes, filename: str = "") -> str:
     2. Fall back to pytesseract OCR if GPT not available
     """
     import os
+    import base64
+    import requests
+    from PIL import Image
+    import io
 
     # FIRST: Try GPT Vision API (if API key available)
     openai_key = os.getenv('OPENAI_API_KEY')
 
     if openai_key:
         try:
-            import base64
-            import requests
+            # Check if it's a PDF - need to convert to images first
+            if filename.lower().endswith('.pdf'):
+                try:
+                    import pdf2image
+                    # Convert PDF to images
+                    images = pdf2image.convert_from_bytes(image_bytes)
 
-            # Convert image to base64
-            base64_image = base64.b64encode(image_bytes).decode('utf-8')
+                    # Process each page with GPT Vision
+                    all_text = []
+                    for page_num, img in enumerate(images):
+                        # Convert PIL image to bytes
+                        img_byte_arr = io.BytesIO()
+                        img.save(img_byte_arr, format='PNG')
+                        img_bytes = img_byte_arr.getvalue()
 
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {openai_key}"
-            }
+                        # Convert to base64
+                        base64_image = base64.b64encode(img_bytes).decode('utf-8')
 
-            payload = {
-                "model": "gpt-4o-mini",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": """Extract ALL text from this image exactly as it appears.
+                        headers = {
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bearer {openai_key}"
+                        }
+
+                        payload = {
+                            "model": "gpt-4o-mini",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {
+                                            "type": "text",
+                                            "text": """Extract ALL text from this image exactly as it appears.
 Include:
 - Product names and descriptions
 - Quantities and measurements
@@ -366,31 +382,94 @@ Include:
 
 Preserve the original layout and formatting as much as possible.
 Return only the extracted text, nothing else."""
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
+                                        },
+                                        {
+                                            "type": "image_url",
+                                            "image_url": {
+                                                "url": f"data:image/png;base64,{base64_image}"
+                                            }
+                                        }
+                                    ]
                                 }
-                            }
-                        ]
-                    }
-                ],
-                "max_tokens": 2000
-            }
+                            ],
+                            "max_tokens": 2000
+                        }
 
-            response = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=30
-            )
+                        response = requests.post(
+                            "https://api.openai.com/v1/chat/completions",
+                            headers=headers,
+                            json=payload,
+                            timeout=30
+                        )
 
-            if response.status_code == 200:
-                extracted_text = response.json()['choices'][0]['message']['content']
-                return extracted_text
+                        if response.status_code == 200:
+                            page_text = response.json()['choices'][0]['message']['content']
+                            all_text.append(page_text)
+                        else:
+                            st.warning(f"GPT Vision API returned status {response.status_code} for page {page_num + 1}. Falling back to pytesseract...")
+                            raise Exception(f"API returned status {response.status_code}")
+
+                    return "\n\n".join(all_text)
+
+                except ImportError:
+                    st.warning("pdf2image not installed. Cannot process PDFs with GPT Vision. Falling back to pytesseract...")
+                except Exception as e:
+                    st.warning(f"GPT Vision PDF processing failed ({str(e)}). Falling back to pytesseract...")
             else:
-                st.warning(f"GPT Vision API returned status {response.status_code}. Falling back to pytesseract...")
+                # It's a regular image file
+                # Convert image to base64
+                base64_image = base64.b64encode(image_bytes).decode('utf-8')
+
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {openai_key}"
+                }
+
+                payload = {
+                    "model": "gpt-4o-mini",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": """Extract ALL text from this image exactly as it appears.
+Include:
+- Product names and descriptions
+- Quantities and measurements
+- Prices and amounts
+- Dates, phone numbers, addresses
+- All numbers and codes
+- Ingredient lists
+- Recipe instructions
+
+Preserve the original layout and formatting as much as possible.
+Return only the extracted text, nothing else."""
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{base64_image}"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    "max_tokens": 2000
+                }
+
+                response = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=30
+                )
+
+                if response.status_code == 200:
+                    extracted_text = response.json()['choices'][0]['message']['content']
+                    return extracted_text
+                else:
+                    st.warning(f"GPT Vision API returned status {response.status_code}. Falling back to pytesseract...")
 
         except Exception as e:
             st.warning(f"GPT Vision extraction failed ({str(e)}). Falling back to pytesseract...")
