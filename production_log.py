@@ -182,12 +182,26 @@ def show_production_log():
                                 recipe = session.query(Recipe).get(batch['recipe_id'])
 
                                 if recipe:
+                                    # Calculate expected cost based on recipe
+                                    from utils import calculate_profit_margin
+                                    expected_cost_per_unit, _, _ = calculate_profit_margin(session, recipe.id)
+                                    expected_total_cost = expected_cost_per_unit * batch['quantity']
+
+                                    # Calculate actual cost (sum of current ingredient costs)
+                                    actual_total_cost = 0.0
+                                    for recipe_item in recipe.recipe_items:
+                                        ingredient = recipe_item.ingredient
+                                        quantity_needed = recipe_item.quantity * batch['quantity']
+                                        actual_total_cost += quantity_needed * ingredient.cost_per_unit
+
                                     # Create production batch record
                                     new_batch = ProductionBatch(
                                         recipe_id=recipe.id,
                                         quantity_produced=batch['quantity'],
                                         production_date=datetime.combine(production_date, datetime.min.time()),
-                                        notes=production_notes if production_notes else None
+                                        notes=production_notes if production_notes else None,
+                                        expected_cost=expected_total_cost,
+                                        actual_cost=actual_total_cost
                                     )
                                     session.add(new_batch)
 
@@ -257,6 +271,38 @@ def show_production_log():
 
                 with col3:
                     st.metric("Recipes Made", unique_recipes)
+
+                # Batch Costing Comparison (if we have cost data)
+                batches_with_costs = [b for b in production_batches if b.expected_cost and b.actual_cost]
+
+                if batches_with_costs:
+                    st.markdown("---")
+                    st.subheader("💰 Batch Costing Analysis")
+
+                    total_expected = sum(b.expected_cost for b in batches_with_costs)
+                    total_actual = sum(b.actual_cost for b in batches_with_costs)
+                    variance = total_actual - total_expected
+                    variance_pct = (variance / total_expected * 100) if total_expected > 0 else 0
+
+                    col_exp, col_act, col_var = st.columns(3)
+
+                    with col_exp:
+                        st.metric("Expected Cost", f"£{total_expected:.2f}")
+
+                    with col_act:
+                        st.metric("Actual Cost", f"£{total_actual:.2f}")
+
+                    with col_var:
+                        variance_label = "Over Budget" if variance > 0 else "Under Budget"
+                        st.metric(variance_label, f"£{abs(variance):.2f}", delta=f"{variance_pct:+.1f}%")
+
+                    # Explanation
+                    if abs(variance_pct) > 10:
+                        st.warning(f"⚠️ Cost variance of {variance_pct:.1f}% - ingredient prices may have changed!")
+                    elif abs(variance_pct) > 5:
+                        st.info(f"💡 Small cost variance of {variance_pct:.1f}% - monitor ingredient prices")
+                    else:
+                        st.success(f"✅ Cost variance under 5% - on track!")
 
                 st.markdown("---")
 

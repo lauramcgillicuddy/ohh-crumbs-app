@@ -69,9 +69,105 @@ def show_recipes():
                             if may_contain:
                                 st.info(f"**May contain:** {', '.join(sorted(may_contain))}")
 
-                            # Generate Label button
-                            if st.button(f"📄 Generate Natasha's Law Label", key=f"generate_label_{recipe.id}"):
-                                st.session_state[f'show_label_{recipe.id}'] = True
+                            col_label, col_scale = st.columns(2)
+
+                            with col_label:
+                                # Generate Label button
+                                if st.button(f"📄 Generate Natasha's Law Label", key=f"generate_label_{recipe.id}"):
+                                    st.session_state[f'show_label_{recipe.id}'] = True
+
+                            with col_scale:
+                                # Recipe Scaling Calculator
+                                if st.button(f"⚖️ Scale Recipe", key=f"scale_recipe_{recipe.id}"):
+                                    st.session_state[f'show_scale_{recipe.id}'] = True
+
+                            # Show scaling calculator if requested
+                            if st.session_state.get(f'show_scale_{recipe.id}', False):
+                                st.markdown("---")
+                                st.markdown("### ⚖️ Recipe Scaling Calculator")
+
+                                scale_factor = st.number_input(
+                                    "Scale Factor (e.g., 2 = double, 0.5 = half)",
+                                    min_value=0.1,
+                                    max_value=100.0,
+                                    value=1.0,
+                                    step=0.1,
+                                    key=f"scale_factor_{recipe.id}",
+                                    help="Enter multiplier: 2 = double batch, 3 = triple batch, 0.5 = half batch"
+                                )
+
+                                # Quick scale buttons
+                                st.write("**Quick Scale:**")
+                                col_half, col_double, col_triple = st.columns(3)
+
+                                with col_half:
+                                    if st.button("× 0.5 (Half)", key=f"scale_half_{recipe.id}"):
+                                        st.session_state[f'scale_factor_{recipe.id}'] = 0.5
+                                        st.rerun()
+
+                                with col_double:
+                                    if st.button("× 2 (Double)", key=f"scale_double_{recipe.id}"):
+                                        st.session_state[f'scale_factor_{recipe.id}'] = 2.0
+                                        st.rerun()
+
+                                with col_triple:
+                                    if st.button("× 3 (Triple)", key=f"scale_triple_{recipe.id}"):
+                                        st.session_state[f'scale_factor_{recipe.id}'] = 3.0
+                                        st.rerun()
+
+                                st.markdown("---")
+
+                                # Scaled recipe
+                                st.write(f"**Scaled Recipe for {recipe.name} (× {scale_factor})**")
+                                st.write("")
+
+                                scaled_cost = 0.0
+                                for item in recipe.recipe_items:
+                                    scaled_qty = item.quantity * scale_factor
+                                    item_cost = item.ingredient.cost_per_unit * scaled_qty
+                                    scaled_cost += item_cost
+                                    st.write(f"• {scaled_qty:.2f} {item.ingredient.unit} of {item.ingredient.name} (£{item_cost:.2f})")
+
+                                st.markdown("---")
+
+                                col_metrics1, col_metrics2, col_metrics3 = st.columns(3)
+
+                                with col_metrics1:
+                                    st.metric("Total Cost", f"£{scaled_cost:.2f}")
+
+                                with col_metrics2:
+                                    scaled_revenue = recipe.sale_price * scale_factor
+                                    st.metric("Revenue", f"£{scaled_revenue:.2f}")
+
+                                with col_metrics3:
+                                    scaled_profit = scaled_revenue - scaled_cost
+                                    st.metric("Profit", f"£{scaled_profit:.2f}")
+
+                                # Check ingredient availability
+                                st.markdown("---")
+                                st.write("**📦 Ingredient Availability Check:**")
+
+                                can_make = True
+                                for item in recipe.recipe_items:
+                                    scaled_qty = item.quantity * scale_factor
+                                    ingredient = item.ingredient
+
+                                    if ingredient.current_stock >= scaled_qty:
+                                        st.success(f"✅ {ingredient.name}: {ingredient.current_stock:.2f} {ingredient.unit} available (need {scaled_qty:.2f})")
+                                    else:
+                                        st.error(f"❌ {ingredient.name}: Only {ingredient.current_stock:.2f} {ingredient.unit} available (need {scaled_qty:.2f})")
+                                        shortage = scaled_qty - ingredient.current_stock
+                                        st.write(f"    Short by: {shortage:.2f} {ingredient.unit}")
+                                        can_make = False
+
+                                if can_make:
+                                    st.success(f"🎉 You have enough ingredients to make {scale_factor}× {recipe.name}!")
+                                else:
+                                    st.warning("⚠️ Not enough ingredients in stock. Order more or reduce scale factor.")
+
+                                if st.button("❌ Close Calculator", key=f"close_scale_{recipe.id}"):
+                                    st.session_state[f'show_scale_{recipe.id}'] = False
+                                    st.rerun()
 
                             # Show label if requested
                             if st.session_state.get(f'show_label_{recipe.id}', False):

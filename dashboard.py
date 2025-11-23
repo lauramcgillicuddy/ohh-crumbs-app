@@ -183,6 +183,105 @@ def show_dashboard():
 
         st.divider()
 
+        # Seasonal Trends Analysis
+        if sales_data and len(sales_data) >= 30:
+            st.subheader("📈 Seasonal Trends & Patterns")
+
+            # Monthly comparison
+            df_monthly = df.copy()
+            df_monthly['month'] = pd.to_datetime(df_monthly['date']).dt.month_name()
+
+            monthly_sales = df_monthly.groupby('month').agg({
+                'amount': 'sum',
+                'quantity': 'sum'
+            }).reset_index()
+
+            # Order months correctly
+            month_order = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December']
+            monthly_sales['month'] = pd.Categorical(monthly_sales['month'], categories=month_order, ordered=True)
+            monthly_sales = monthly_sales.sort_values('month')
+
+            if len(monthly_sales) > 0:
+                col_month1, col_month2 = st.columns(2)
+
+                with col_month1:
+                    # Monthly revenue
+                    fig_monthly_rev = px.bar(
+                        monthly_sales,
+                        x='month',
+                        y='amount',
+                        title='Revenue by Month',
+                        labels={'amount': 'Revenue (£)', 'month': 'Month'}
+                    )
+                    fig_monthly_rev.update_layout(
+                        paper_bgcolor='#FFF7F2',
+                        font=dict(color='#2C1735')
+                    )
+                    fig_monthly_rev.update_traces(marker_color='#F29BB2')
+                    st.plotly_chart(fig_monthly_rev, use_container_width=True)
+
+                with col_month2:
+                    # Monthly items sold
+                    fig_monthly_items = px.bar(
+                        monthly_sales,
+                        x='month',
+                        y='quantity',
+                        title='Items Sold by Month',
+                        labels={'quantity': 'Items Sold', 'month': 'Month'}
+                    )
+                    fig_monthly_items.update_layout(
+                        paper_bgcolor='#FFF7F2',
+                        font=dict(color='#2C1735')
+                    )
+                    fig_monthly_items.update_traces(marker_color='#FFD4E5')
+                    st.plotly_chart(fig_monthly_items, use_container_width=True)
+
+            # Day of week analysis
+            df_dow = df.copy()
+            df_dow['day_of_week'] = pd.to_datetime(df_dow['date']).dt.day_name()
+
+            dow_sales = df_dow.groupby('day_of_week').agg({
+                'amount': 'mean',
+                'quantity': 'mean'
+            }).reset_index()
+
+            # Order days correctly
+            day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            dow_sales['day_of_week'] = pd.Categorical(dow_sales['day_of_week'], categories=day_order, ordered=True)
+            dow_sales = dow_sales.sort_values('day_of_week')
+
+            st.write("**📅 Average Sales by Day of Week:**")
+
+            fig_dow = px.bar(
+                dow_sales,
+                x='day_of_week',
+                y='amount',
+                title='Average Daily Revenue by Day of Week',
+                labels={'amount': 'Avg Revenue (£)', 'day_of_week': 'Day'}
+            )
+            fig_dow.update_layout(
+                paper_bgcolor='#FFF7F2',
+                font=dict(color='#2C1735')
+            )
+            fig_dow.update_traces(marker_color='#F29BB2')
+            st.plotly_chart(fig_dow, use_container_width=True)
+
+            # Find best and worst days
+            if len(dow_sales) > 0:
+                best_day = dow_sales.loc[dow_sales['amount'].idxmax(), 'day_of_week']
+                worst_day = dow_sales.loc[dow_sales['amount'].idxmin(), 'day_of_week']
+
+                col_best, col_worst = st.columns(2)
+
+                with col_best:
+                    st.success(f"🌟 **Best Day:** {best_day}")
+
+                with col_worst:
+                    st.info(f"💤 **Slowest Day:** {worst_day}")
+
+            st.divider()
+
         st.subheader("📄 Export Reports")
 
         if st.button("📥 Generate PDF Sales Report", use_container_width=True):
