@@ -90,29 +90,35 @@ def show_ingredients():
                         
                         with col_edit2:
                             if st.button(f"🗑️ Delete", key=f"delete_{ingredient.id}"):
-                                # Check if ingredient is used in any recipes
-                                recipe_uses = session.query(RecipeItem).filter(
-                                    RecipeItem.ingredient_id == ingredient.id
-                                ).count()
+                                try:
+                                    # Rollback any pending changes first to avoid conflicts
+                                    session.rollback()
 
-                                # Check if ingredient is in any supplier orders
-                                order_uses = session.query(SupplierOrderItem).filter(
-                                    SupplierOrderItem.ingredient_id == ingredient.id
-                                ).count()
+                                    # Re-fetch the ingredient after rollback
+                                    ingredient = session.query(Ingredient).get(ingredient.id)
 
-                                if recipe_uses > 0:
-                                    st.error(f"❌ Cannot delete {ingredient.name} - it's used in {recipe_uses} recipe(s). Remove it from recipes first!")
-                                elif order_uses > 0:
-                                    st.error(f"❌ Cannot delete {ingredient.name} - it's in {order_uses} supplier order(s). This is historical data that should be kept.")
-                                else:
-                                    try:
+                                    # Check if ingredient is used in any recipes
+                                    recipe_uses = session.query(RecipeItem).filter(
+                                        RecipeItem.ingredient_id == ingredient.id
+                                    ).count()
+
+                                    # Check if ingredient is in any supplier orders
+                                    order_uses = session.query(SupplierOrderItem).filter(
+                                        SupplierOrderItem.ingredient_id == ingredient.id
+                                    ).count()
+
+                                    if recipe_uses > 0:
+                                        st.error(f"❌ Cannot delete {ingredient.name} - it's used in {recipe_uses} recipe(s). Remove it from recipes first!")
+                                    elif order_uses > 0:
+                                        st.error(f"❌ Cannot delete {ingredient.name} - it's in {order_uses} supplier order(s). This is historical data that should be kept.")
+                                    else:
                                         session.delete(ingredient)
                                         session.commit()
                                         st.success(f"✅ Deleted {ingredient.name}")
                                         st.rerun()
-                                    except Exception as e:
-                                        session.rollback()
-                                        st.error(f"Error deleting ingredient: {str(e)}")
+                                except Exception as e:
+                                    session.rollback()
+                                    st.error(f"Error deleting ingredient: {str(e)}")
                         
                         if st.session_state.get(f'editing_{ingredient.id}', False):
                             with st.form(key=f"edit_form_{ingredient.id}"):

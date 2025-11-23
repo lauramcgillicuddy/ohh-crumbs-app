@@ -208,15 +208,21 @@ def show_recipes():
                         
                         with col_delete:
                             if st.button(f"🗑️ Delete Recipe", key=f"delete_recipe_{recipe.id}"):
-                                # Check if recipe is used in any production batches
-                                production_uses = session.query(ProductionBatch).filter(
-                                    ProductionBatch.recipe_id == recipe.id
-                                ).count()
+                                try:
+                                    # Rollback any pending changes first to avoid conflicts
+                                    session.rollback()
 
-                                if production_uses > 0:
-                                    st.error(f"❌ Cannot delete {recipe.name} - it's been used in {production_uses} production batch(es). This is historical data that should be kept!")
-                                else:
-                                    try:
+                                    # Re-fetch the recipe after rollback
+                                    recipe = session.query(Recipe).get(recipe.id)
+
+                                    # Check if recipe is used in any production batches
+                                    production_uses = session.query(ProductionBatch).filter(
+                                        ProductionBatch.recipe_id == recipe.id
+                                    ).count()
+
+                                    if production_uses > 0:
+                                        st.error(f"❌ Cannot delete {recipe.name} - it's been used in {production_uses} production batch(es). This is historical data that should be kept!")
+                                    else:
                                         # Delete recipe items first (they're part of the recipe)
                                         session.query(RecipeItem).filter(
                                             RecipeItem.recipe_id == recipe.id
@@ -227,9 +233,9 @@ def show_recipes():
                                         session.commit()
                                         st.success(f"✅ Deleted recipe: {recipe.name}")
                                         st.rerun()
-                                    except Exception as e:
-                                        session.rollback()
-                                        st.error(f"Error deleting recipe: {str(e)}")
+                                except Exception as e:
+                                    session.rollback()
+                                    st.error(f"Error deleting recipe: {str(e)}")
                         
                         if st.session_state.get(f'editing_recipe_{recipe.id}', False):
                             st.write("---")
