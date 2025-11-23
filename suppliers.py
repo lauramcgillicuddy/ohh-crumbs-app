@@ -190,6 +190,8 @@ def show_suppliers():
                                 df = pd.DataFrame(items_data)
                                 st.dataframe(df, use_container_width=True, hide_index=True)
 
+                        st.markdown("---")
+
                         if order.status != 'delivered':
                             col_status1, col_status2 = st.columns(2)
 
@@ -213,6 +215,48 @@ def show_suppliers():
                                     session.commit()
                                     st.success("Order cancelled")
                                     st.rerun()
+
+                        # Delete button (always available)
+                        if st.button("🗑️ Delete Order", key=f"delete_order_{order.id}", type="secondary"):
+                            try:
+                                # Rollback any pending changes first
+                                session.rollback()
+
+                                # Re-fetch the order after rollback
+                                order = session.query(SupplierOrder).get(order.id)
+
+                                # Warn if order was delivered (stock was already updated)
+                                if order.status == 'delivered':
+                                    st.warning("⚠️ This order was marked as delivered and stock was already updated. Deleting it will NOT reverse the stock changes!")
+
+                                    # Add confirmation
+                                    if st.button("⚠️ Yes, Delete Anyway", key=f"confirm_delete_order_{order.id}", type="primary"):
+                                        # Delete order items first
+                                        session.query(SupplierOrderItem).filter(
+                                            SupplierOrderItem.order_id == order.id
+                                        ).delete()
+
+                                        # Delete the order
+                                        session.delete(order)
+                                        session.commit()
+                                        st.success("✅ Order deleted")
+                                        st.rerun()
+                                else:
+                                    # Safe to delete - not delivered yet
+                                    # Delete order items first
+                                    session.query(SupplierOrderItem).filter(
+                                        SupplierOrderItem.order_id == order.id
+                                    ).delete()
+
+                                    # Delete the order
+                                    session.delete(order)
+                                    session.commit()
+                                    st.success("✅ Order deleted")
+                                    st.rerun()
+
+                            except Exception as e:
+                                session.rollback()
+                                st.error(f"Error deleting order: {str(e)}")
             else:
                 st.info("📭 No orders yet. Create a new order in the 'Create Order' tab!")
 

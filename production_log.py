@@ -324,7 +324,7 @@ def show_production_log():
                             recipe = session.query(Recipe).get(batch.recipe_id)
 
                             if recipe:
-                                col_recipe, col_qty = st.columns([3, 1])
+                                col_recipe, col_qty, col_delete = st.columns([3, 1, 1])
 
                                 with col_recipe:
                                     st.write(f"**{recipe.name}**")
@@ -333,6 +333,31 @@ def show_production_log():
 
                                 with col_qty:
                                     st.write(f"{batch.quantity_produced:.1f} items")
+
+                                with col_delete:
+                                    if st.button("🗑️", key=f"delete_batch_{batch.id}", help="Delete this batch"):
+                                        try:
+                                            # Rollback any pending changes first
+                                            session.rollback()
+
+                                            # Re-fetch the batch after rollback
+                                            batch = session.query(ProductionBatch).get(batch.id)
+
+                                            # Warn about stock already being deducted
+                                            st.warning("⚠️ Stock was already deducted when this batch was created. Deleting will NOT restore ingredient stock!")
+
+                                            # Add confirmation
+                                            if st.button("⚠️ Yes, Delete", key=f"confirm_delete_batch_{batch.id}", type="primary"):
+                                                session.delete(batch)
+                                                session.commit()
+                                                st.success("✅ Batch deleted")
+                                                st.rerun()
+
+                                        except Exception as e:
+                                            session.rollback()
+                                            st.error(f"Error deleting batch: {str(e)}")
+
+                                st.markdown("---")
 
                 st.markdown("---")
 
