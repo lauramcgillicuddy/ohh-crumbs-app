@@ -52,22 +52,31 @@ def parse_receipt_text(text: str) -> Dict:
                 email_phone_indices.append(idx)
 
         # Prefer vendor/supplier names over customer names
-        # Filter out lines starting with "Deliver", "Invoice To", "To:", etc.
-        supplier_matches = [
-            match for match in company_matches
-            if not re.match(r'^(Deliver|Invoice To|To:)', match[2], re.IGNORECASE)
+        # Filter out lines that contain customer-related keywords
+        customer_keywords = [
+            r'deliver\s+to', r'invoice\s+to', r'bill\s+to', r'sold\s+to',
+            r'ship\s+to', r'customer', r'buyer', r'^to:', r'^deliver'
         ]
+
+        supplier_matches = []
+        for match in company_matches:
+            line_lower = match[2].lower()
+            # Check if line contains any customer keywords
+            is_customer_line = any(re.search(pattern, line_lower) for pattern in customer_keywords)
+            if not is_customer_line:
+                supplier_matches.append(match)
 
         # Use supplier matches if we found any, otherwise use all matches
         candidates = supplier_matches if supplier_matches else company_matches
 
-        # Pick company name closest to contact info
-        if email_phone_indices:
+        # Pick company name closest to contact info (email/phone)
+        if email_phone_indices and candidates:
             best_match = min(candidates,
                            key=lambda x: min(abs(x[0] - ei) for ei in email_phone_indices))
             result['vendor_name'] = best_match[1]
-        else:
-            # No contact info found, just use first match
+        elif candidates:
+            # No contact info found, prefer the first non-customer match
+            # Usually vendor info is at the top of the invoice
             result['vendor_name'] = candidates[0][1]
 
     # Extract email
@@ -251,8 +260,13 @@ def parse_receipt_with_ai(image_bytes: bytes) -> Optional[Dict]:
                     "content": [
                         {
                             "type": "text",
-                            "text": """Extract the following information from this receipt/invoice:
-1. Vendor name
+                            "text": """Extract the following information from this receipt/invoice.
+
+IMPORTANT: The VENDOR is the company that ISSUED this invoice (the seller/supplier).
+Do NOT confuse it with the customer (the "Deliver To", "Invoice To", or "Bill To" address).
+
+Extract:
+1. Vendor/Supplier name (the company that issued this invoice, usually at the top)
 2. Vendor email (if present)
 3. Vendor phone (if present)
 4. Vendor address (if present)
@@ -271,7 +285,9 @@ Return as JSON with this structure:
     {"item_name": "...", "quantity": 1.0, "unit_cost": 10.0, "total_cost": 10.0}
   ],
   "total_amount": 100.0
-}"""
+}
+
+Remember: vendor = the supplier who sent the invoice, NOT the customer."""
                         },
                         {
                             "type": "image_url",
@@ -282,7 +298,7 @@ Return as JSON with this structure:
                     ]
                 }
             ],
-            "max_tokens": 1000
+            "max_tokens": 1500
         }
 
         response = requests.post(
