@@ -12,3 +12,4 @@ Pillow
 pdf2image
 markdown
 weasyprint
+python-docx
