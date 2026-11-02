@@ -393,11 +393,11 @@ def show_production_planner():
                         title=f'Daily Sales: {selected_recipe.name}'
                     )
                     fig.update_layout(
-                        paper_bgcolor='#FFF7F2',
+                        paper_bgcolor='rgba(0,0,0,0)',
                         plot_bgcolor='rgba(255,247,242,0.5)',
-                        font=dict(color='#2C1735')
+                        font=dict(color='#2C3144')
                     )
-                    fig.update_traces(marker_color='#F29BB2')
+                    fig.update_traces(marker_color='#566385')
 
                     # Add trend line
                     fig.add_scatter(
@@ -429,10 +429,10 @@ def show_production_planner():
                         title='Average Sales by Day of Week'
                     )
                     fig_weekday.update_layout(
-                        paper_bgcolor='#FFF7F2',
-                        font=dict(color='#2C1735')
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='#2C3144')
                     )
-                    fig_weekday.update_traces(marker_color='#FFD4E5')
+                    fig_weekday.update_traces(marker_color='#9093B6')
 
                     st.plotly_chart(fig_weekday, use_container_width=True)
 

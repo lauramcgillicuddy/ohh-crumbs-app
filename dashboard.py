@@ -118,23 +118,23 @@ def show_dashboard():
             )
             fig_revenue.update_layout(
                 height=400,
-                plot_bgcolor='rgba(255,247,242,0.5)',
-                paper_bgcolor='#FFF7F2',
-                font=dict(color='#2C1735', size=12),
-                title_font=dict(size=16, color='#F29BB2', family='Baloo 2'),
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#2C3144', size=12),
+                title_font=dict(size=16, color='#566385', family='Inter'),
                 xaxis=dict(
                     title='Date',
-                    gridcolor='#FFE4F2',
+                    gridcolor='#E7E9F2',
                     showgrid=True
                 ),
                 yaxis=dict(
                     title='Revenue (£)',
-                    gridcolor='#FFE4F2',
+                    gridcolor='#E7E9F2',
                     showgrid=True
                 )
             )
             fig_revenue.update_traces(
-                line=dict(color='#F29BB2', width=3),
+                line=dict(color='#566385', width=3),
                 fill='tozeroy',
                 fillcolor='rgba(242, 155, 178, 0.2)'
             )
@@ -157,24 +157,24 @@ def show_dashboard():
             )
             fig_items.update_layout(
                 height=400,
-                plot_bgcolor='rgba(255,247,242,0.5)',
-                paper_bgcolor='#FFF7F2',
-                font=dict(color='#2C1735', size=12),
-                title_font=dict(size=16, color='#F29BB2', family='Baloo 2'),
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#2C3144', size=12),
+                title_font=dict(size=16, color='#566385', family='Inter'),
                 xaxis=dict(
                     title='Item',
-                    gridcolor='#FFE4F2',
+                    gridcolor='#E7E9F2',
                     tickangle=-45
                 ),
                 yaxis=dict(
                     title='Units Sold',
-                    gridcolor='#FFE4F2'
+                    gridcolor='#E7E9F2'
                 )
             )
             fig_items.update_traces(
                 marker=dict(
-                    color='#F29BB2',
-                    line=dict(color='#FFE4F2', width=2)
+                    color='#566385',
+                    line=dict(color='#E7E9F2', width=2)
                 )
             )
             st.plotly_chart(fig_items, use_container_width=True)
@@ -215,10 +215,10 @@ def show_dashboard():
                         labels={'amount': 'Revenue (£)', 'month': 'Month'}
                     )
                     fig_monthly_rev.update_layout(
-                        paper_bgcolor='#FFF7F2',
-                        font=dict(color='#2C1735')
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='#2C3144')
                     )
-                    fig_monthly_rev.update_traces(marker_color='#F29BB2')
+                    fig_monthly_rev.update_traces(marker_color='#566385')
                     st.plotly_chart(fig_monthly_rev, use_container_width=True)
 
                 with col_month2:
@@ -231,10 +231,10 @@ def show_dashboard():
                         labels={'quantity': 'Items Sold', 'month': 'Month'}
                     )
                     fig_monthly_items.update_layout(
-                        paper_bgcolor='#FFF7F2',
-                        font=dict(color='#2C1735')
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='#2C3144')
                     )
-                    fig_monthly_items.update_traces(marker_color='#FFD4E5')
+                    fig_monthly_items.update_traces(marker_color='#9093B6')
                     st.plotly_chart(fig_monthly_items, use_container_width=True)
 
             # Day of week analysis
@@ -261,10 +261,10 @@ def show_dashboard():
                 labels={'amount': 'Avg Revenue (£)', 'day_of_week': 'Day'}
             )
             fig_dow.update_layout(
-                paper_bgcolor='#FFF7F2',
-                font=dict(color='#2C1735')
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#2C3144')
             )
-            fig_dow.update_traces(marker_color='#F29BB2')
+            fig_dow.update_traces(marker_color='#566385')
             st.plotly_chart(fig_dow, use_container_width=True)
 
             # Find best and worst days

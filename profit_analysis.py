@@ -84,7 +84,7 @@ def show_profit_analysis():
                     marker=dict(
                         size=df['Total Profit'].apply(lambda x: max(10, min(50, x / 2))),
                         color=df['Margin %'],
-                        colorscale='RdYlGn',
+                        colorscale=[[0.0, '#EEF0F6'], [0.5, '#9093B6'], [1.0, '#3E4A66']],
                         showscale=True,
                         colorbar=dict(title="Margin %")
                     ),
@@ -119,7 +119,7 @@ def show_profit_analysis():
                 orientation='h',
                 title='Profit Margin by Item',
                 color='Margin %',
-                color_continuous_scale='RdYlGn',
+                color_continuous_scale=['#EEF0F6', '#9093B6', '#3E4A66'],
                 labels={'Margin %': 'Profit Margin (%)'}
             )
             fig_margin.update_layout(height=max(400, len(df) * 30))

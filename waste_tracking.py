@@ -195,8 +195,8 @@ def show_waste_tracking():
                         title='Waste Cost by Reason'
                     )
                     fig_pie.update_layout(
-                        paper_bgcolor='#FFF7F2',
-                        font=dict(color='#2C1735')
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='#2C3144')
                     )
                     st.plotly_chart(fig_pie, use_container_width=True)
 
@@ -209,11 +209,11 @@ def show_waste_tracking():
                         y='cost',
                         title='Waste Cost by Type',
                         color='type',
-                        color_discrete_map={'Ingredient': '#F29BB2', 'Product': '#FFD4E5'}
+                        color_discrete_map={'Ingredient': '#566385', 'Product': '#9093B6'}
                     )
                     fig_bar.update_layout(
-                        paper_bgcolor='#FFF7F2',
-                        font=dict(color='#2C1735'),
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='#2C3144'),
                         showlegend=False
                     )
                     st.plotly_chart(fig_bar, use_container_width=True)
@@ -229,11 +229,11 @@ def show_waste_tracking():
                     title='Daily Waste Cost Trend'
                 )
                 fig_trend.update_layout(
-                    paper_bgcolor='#FFF7F2',
+                    paper_bgcolor='rgba(0,0,0,0)',
                     plot_bgcolor='rgba(255,247,242,0.5)',
-                    font=dict(color='#2C1735')
+                    font=dict(color='#2C3144')
                 )
-                fig_trend.update_traces(line=dict(color='#F29BB2', width=3))
+                fig_trend.update_traces(line=dict(color='#566385', width=3))
                 st.plotly_chart(fig_trend, use_container_width=True)
 
         with tab3:

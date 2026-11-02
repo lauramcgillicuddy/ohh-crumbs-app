@@ -191,9 +191,9 @@ def show_cash_flow():
             title='Daily Cash Flow',
             xaxis_title='Date',
             yaxis_title='Amount (£)',
-            paper_bgcolor='#FFF7F2',
+            paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(255,247,242,0.5)',
-            font=dict(color='#2C1735'),
+            font=dict(color='#2C3144'),
             hovermode='x unified',
             barmode='relative'
         )
@@ -266,9 +266,9 @@ def show_cash_flow():
             title='Cash Balance Over Time',
             xaxis_title='Date',
             yaxis_title='Cash Balance (£)',
-            paper_bgcolor='#FFF7F2',
+            paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(255,247,242,0.5)',
-            font=dict(color='#2C1735'),
+            font=dict(color='#2C3144'),
             hovermode='x unified'
         )
 
@@ -355,8 +355,8 @@ def show_cash_flow():
                     title='Expense Distribution'
                 )
                 fig_pie.update_layout(
-                    paper_bgcolor='#FFF7F2',
-                    font=dict(color='#2C1735')
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#2C3144')
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
 

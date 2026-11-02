@@ -47,8 +47,8 @@ def markdown_to_pdf(markdown_file, pdf_file):
             }}
 
             h1 {{
-                color: #F29BB2;
-                border-bottom: 3px solid #FFE4F2;
+                color: #566385;
+                border-bottom: 3px solid #E7E9F2;
                 padding-bottom: 10px;
                 page-break-before: always;
                 margin-top: 30px;
@@ -60,30 +60,30 @@ def markdown_to_pdf(markdown_file, pdf_file):
 
             h2 {{
                 color: #FF6B9D;
-                border-bottom: 2px solid #FFE4F2;
+                border-bottom: 2px solid #E7E9F2;
                 padding-bottom: 5px;
                 margin-top: 25px;
             }}
 
             h3 {{
-                color: #F29BB2;
+                color: #566385;
                 margin-top: 20px;
             }}
 
             code {{
-                background-color: #FFF7F2;
+                background-color: #FFFFFF;
                 padding: 2px 6px;
                 border-radius: 3px;
                 font-family: "Courier New", monospace;
                 font-size: 0.9em;
-                color: #2C1735;
+                color: #2C3144;
             }}
 
             pre {{
-                background-color: #FFF7F2;
+                background-color: #FFFFFF;
                 padding: 15px;
                 border-radius: 5px;
-                border-left: 4px solid #F29BB2;
+                border-left: 4px solid #566385;
                 overflow-x: auto;
                 page-break-inside: avoid;
             }}
@@ -101,14 +101,14 @@ def markdown_to_pdf(markdown_file, pdf_file):
             }}
 
             th, td {{
-                border: 1px solid #FFE4F2;
+                border: 1px solid #E7E9F2;
                 padding: 10px;
                 text-align: left;
             }}
 
             th {{
-                background-color: #FFF7F2;
-                color: #2C1735;
+                background-color: #FFFFFF;
+                color: #2C3144;
                 font-weight: bold;
             }}
 
@@ -117,12 +117,12 @@ def markdown_to_pdf(markdown_file, pdf_file):
             }}
 
             blockquote {{
-                border-left: 4px solid #F29BB2;
+                border-left: 4px solid #566385;
                 padding-left: 15px;
                 margin-left: 0;
                 color: #666;
                 font-style: italic;
-                background-color: #FFF7F2;
+                background-color: #FFFFFF;
                 padding: 10px 15px;
             }}
 
@@ -146,7 +146,7 @@ def markdown_to_pdf(markdown_file, pdf_file):
 
             hr {{
                 border: none;
-                border-top: 2px solid #FFE4F2;
+                border-top: 2px solid #E7E9F2;
                 margin: 30px 0;
             }}
 

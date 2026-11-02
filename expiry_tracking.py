@@ -331,8 +331,8 @@ def show_expiry_tracking():
                     title=f'Value of Expiring Inventory ({warning_days_analytics} Days)'
                 )
                 fig.update_layout(
-                    paper_bgcolor='#FFF7F2',
-                    font=dict(color='#2C1735')
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#2C3144')
                 )
                 st.plotly_chart(fig, use_container_width=True)
 

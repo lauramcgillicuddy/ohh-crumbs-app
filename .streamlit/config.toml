@@ -1,6 +1,7 @@
 [theme]
-primaryColor = "#F29BB2"          # strawberry icing
-backgroundColor = "#FFF7F2"       # cream
-secondaryBackgroundColor = "#FFE4F2"  # pale pink panel
-textColor = "#2C1735"             # deep plum
+base = "light"
+primaryColor = "#566385"              # slate navy — brand anchor
+backgroundColor = "#F7F8FB"           # cool off-white
+secondaryBackgroundColor = "#EEF0F6"  # light periwinkle panel
+textColor = "#2C3144"                 # ink
 font = "sans serif"
