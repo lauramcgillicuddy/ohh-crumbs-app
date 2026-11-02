@@ -10,6 +10,7 @@ init_db()
 # --- Import your pages (top-level .py files) ---
 import dashboard, ingredients, inventory, inventory_alerts, profit_analysis, recipes, suppliers, square_setup, production_log
 import waste_tracking, equipment_maintenance, expiry_tracking, production_planner, cash_flow, chatgpt_export
+import audit
 
 st.sidebar.title("🍰 Ohh Crumbs")
 page = st.sidebar.radio(
@@ -25,6 +26,7 @@ page = st.sidebar.radio(
         "🔔 Inventory Alerts",
         "🗑️ Waste Tracking",
         "💰 Profit Analysis",
+        "🔍 Profitability Audit",
         "💸 Cash Flow Forecast",
         "🔧 Equipment Maintenance",
         "📦 Suppliers",
@@ -50,6 +52,7 @@ elif page.startswith("⏰"): call(expiry_tracking, "show_expiry_tracking")
 elif page.startswith("🔔"): call(inventory_alerts, "show_inventory_alerts")
 elif page.startswith("🗑️"): call(waste_tracking, "show_waste_tracking")
 elif page.startswith("💰"): call(profit_analysis, "show_profit_analysis")
+elif page.startswith("🔍"): call(audit, "show_audit")
 elif page.startswith("💸"): call(cash_flow, "show_cash_flow")
 elif page.startswith("🔧"): call(equipment_maintenance, "show_equipment_maintenance")
 elif page.startswith("📦"): call(suppliers, "show_suppliers")

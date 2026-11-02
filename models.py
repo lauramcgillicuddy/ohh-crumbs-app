@@ -287,3 +287,96 @@ class UserRole(Base):
 
     def __repr__(self):
         return f"<UserRole(username='{self.username}', role='{self.role}')>"
+
+
+# ---------------------------------------------------------------------------
+# Live Square sync — transaction-level tables.
+# These capture what the old SalesCache dropped: order-level discounts,
+# tenders (cash vs card), processing fees, and full line-item detail.
+# Linked by Square's own order id (string) to keep upserts simple.
+# ---------------------------------------------------------------------------
+class SalesOrder(Base):
+    __tablename__ = 'sales_orders'
+
+    id = Column(Integer, primary_key=True)
+    square_order_id = Column(String(255), unique=True, index=True, nullable=False)
+    location_id = Column(String(100))
+    created_at = Column(DateTime, index=True)
+    state = Column(String(50))
+    source = Column(String(100))              # sales channel
+    gross_sales = Column(Float, default=0.0)  # before discounts
+    total_discount = Column(Float, default=0.0)
+    total_tax = Column(Float, default=0.0)
+    net_amount = Column(Float, default=0.0)   # what the customer paid
+    synced_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<SalesOrder(square_order_id='{self.square_order_id}', net={self.net_amount})>"
+
+
+class SalesLineItem(Base):
+    __tablename__ = 'sales_line_items'
+
+    id = Column(Integer, primary_key=True)
+    square_order_id = Column(String(255), index=True, nullable=False)
+    square_uid = Column(String(255))
+    name = Column(String(255))
+    variation = Column(String(255))
+    category = Column(String(255))
+    quantity = Column(Float, default=1.0)
+    gross_sales = Column(Float, default=0.0)
+    discount_amount = Column(Float, default=0.0)
+    tax_amount = Column(Float, default=0.0)
+    net_amount = Column(Float, default=0.0)
+    created_at = Column(DateTime, index=True)
+
+    def __repr__(self):
+        return f"<SalesLineItem(name='{self.name}', qty={self.quantity}, net={self.net_amount})>"
+
+
+class SalesPayment(Base):
+    __tablename__ = 'sales_payments'
+
+    id = Column(Integer, primary_key=True)
+    square_payment_id = Column(String(255), unique=True, index=True, nullable=False)
+    square_order_id = Column(String(255), index=True)
+    tender_type = Column(String(50))          # CARD / CASH / EXTERNAL / ...
+    card_brand = Column(String(50))
+    amount = Column(Float, default=0.0)
+    processing_fee = Column(Float, default=0.0)
+    status = Column(String(50))
+    created_at = Column(DateTime, index=True)
+
+    def __repr__(self):
+        return f"<SalesPayment(type='{self.tender_type}', amount={self.amount}, fee={self.processing_fee})>"
+
+
+class SalesDiscountApplied(Base):
+    __tablename__ = 'sales_discounts_applied'
+
+    id = Column(Integer, primary_key=True)
+    square_order_id = Column(String(255), index=True, nullable=False)
+    square_uid = Column(String(255))
+    name = Column(String(255))
+    amount = Column(Float, default=0.0)
+    scope = Column(String(50))                # ORDER / LINE_ITEM
+    created_at = Column(DateTime, index=True)
+
+    def __repr__(self):
+        return f"<SalesDiscountApplied(name='{self.name}', amount={self.amount})>"
+
+
+class SyncLog(Base):
+    __tablename__ = 'sync_log'
+
+    id = Column(Integer, primary_key=True)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    window_start = Column(DateTime)
+    window_end = Column(DateTime)
+    orders_synced = Column(Integer, default=0)
+    payments_synced = Column(Integer, default=0)
+    status = Column(String(50), default='ok')
+    message = Column(Text)
+
+    def __repr__(self):
+        return f"<SyncLog(start={self.window_start}, orders={self.orders_synced})>"

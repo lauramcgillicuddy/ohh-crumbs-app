@@ -1,15 +1,7 @@
-streamlit==1.39.0
+# Slim deps for the audit page entry point (audit_app.py) on Streamlit Cloud.
+# The full 30-page hub (app.py) needs more — see requirements-full.txt.
+streamlit
 pandas
 plotly
 sqlalchemy
-psycopg2-binary
-requests
-reportlab
-fpdf2==2.*
 squareup
-streamlit-qrcode-scanner
-Pillow
-pdf2image
-markdown
-weasyprint
-python-docx
