@@ -5,7 +5,14 @@ from models import Base
 import streamlit as st
 
 def get_database_url():
-    return os.getenv('DATABASE_URL')
+    url = os.getenv('DATABASE_URL')
+    if not url:
+        # Fall back to a local SQLite file so the app runs without external DB
+        # config (e.g. a first Streamlit Cloud deploy). Set DATABASE_URL to a
+        # hosted Postgres for persistent, shared data.
+        from pathlib import Path
+        url = f"sqlite:///{Path(__file__).with_name('ohh_crumbs.db')}"
+    return url
 
 @st.cache_resource
 def get_engine():
