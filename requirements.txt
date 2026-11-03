@@ -1,7 +1,18 @@
-# Slim deps for the audit page entry point (audit_app.py) on Streamlit Cloud.
-# The full 30-page hub (app.py) needs more — see requirements-full.txt.
+# Full Ohh Crumbs hub (app.py) — every page.
+# NOTE: weasyprint and markdown are intentionally omitted. Only the standalone
+# generate_pdf_docs.py dev script imports them; the running app never does, and
+# weasyprint needs system libs that broke the Streamlit Cloud install.
+# streamlit is left unpinned so Cloud gets a modern Pillow wheel (the old
+# streamlit==1.39.0 pin was what forced the failing Pillow build).
 streamlit
 pandas
 plotly
 sqlalchemy
 squareup
+python-docx
+reportlab
+fpdf2
+requests
+Pillow
+pdf2image
+psycopg2-binary
