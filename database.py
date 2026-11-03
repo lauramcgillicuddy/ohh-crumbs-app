@@ -19,9 +19,13 @@ def get_database_url():
     if not url:
         from pathlib import Path
         url = f"sqlite:///{Path(__file__).with_name('ohh_crumbs.db')}"
-    # SQLAlchemy 2.x rejects the legacy 'postgres://' scheme some providers emit.
+    # Normalize to the psycopg (v3) driver. SQLAlchemy 2.1's default for a bare
+    # 'postgresql://' URL is psycopg v3 — the driver we install (psycopg[binary])
+    # — so pin it explicitly; otherwise the scheme can resolve to psycopg2.
     if url.startswith('postgres://'):
         url = url.replace('postgres://', 'postgresql://', 1)
+    if url.startswith('postgresql://') and not url.startswith('postgresql+'):
+        url = url.replace('postgresql://', 'postgresql+psycopg://', 1)
     return url
 
 @st.cache_resource
