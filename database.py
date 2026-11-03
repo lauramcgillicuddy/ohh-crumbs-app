@@ -5,13 +5,23 @@ from models import Base
 import streamlit as st
 
 def get_database_url():
+    # 1. Explicit env var (local dev, or a host that injects secrets as env vars).
     url = os.getenv('DATABASE_URL')
+    # 2. Streamlit secrets — the "Manage app -> Secrets" box on Streamlit Cloud.
     if not url:
-        # Fall back to a local SQLite file so the app runs without external DB
-        # config (e.g. a first Streamlit Cloud deploy). Set DATABASE_URL to a
-        # hosted Postgres for persistent, shared data.
+        try:
+            url = st.secrets.get('DATABASE_URL')
+        except Exception:
+            url = None
+    # 3. Fall back to a local SQLite file so the app still runs with no config.
+    #    NOTE: on Streamlit Cloud this file is WIPED on every reboot — set
+    #    DATABASE_URL to a hosted Postgres (e.g. Neon) for data that persists.
+    if not url:
         from pathlib import Path
         url = f"sqlite:///{Path(__file__).with_name('ohh_crumbs.db')}"
+    # SQLAlchemy 2.x rejects the legacy 'postgres://' scheme some providers emit.
+    if url.startswith('postgres://'):
+        url = url.replace('postgres://', 'postgresql://', 1)
     return url
 
 @st.cache_resource
